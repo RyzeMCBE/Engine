@@ -1,0 +1,126 @@
+name: Engine upstream source compatibility (no publishing)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/central-upstream-source-build.yml'
+      - 'docs/central-upstream-sources.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-upstream:
+    name: Source build / ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: math
+            repository: CloudburstMC/math
+            sha: aa0f810e3f1c12afbf0b6b30354d7cf8ed6ea0b3
+            java: '11'
+          - target: natives
+            repository: CloudburstMC/Natives
+            sha: 41826fe18358f7358707dc55e698abc16cdcc49a
+            java: '11'
+          - target: raknet
+            repository: CloudburstMC/Network
+            sha: 78a3224e829f2c4bcfe5a298320477d2f46ce6fa
+            java: '21'
+          - target: nethernet
+            repository: CloudburstMC/Network
+            sha: 247cdfda6ec02cfef75bbdc9704ad1961245d6fb
+            java: '21'
+          - target: okaeri
+            repository: OkaeriPoland/okaeri-configs
+            sha: b20e94ea63fc3089bb892318ad305792a72274f9
+            java: '11'
+          - target: libdatachannel
+            repository: opencollab-incubator/libdatachannel-java
+            sha: 0eb42beb7f7b17e8b383ea848a52d1c2da0c8e7c
+            java: '21'
+
+    steps:
+      - name: Check out pinned original source (and recursive submodules)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          path: upstream
+
+      - name: Verify source revision
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ matrix.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -f upstream/LICENSE -o -f upstream/LICENSE.txt
+          echo "Checked out $EXPECTED_SHA"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      - name: Install build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y maven build-essential cmake pkg-config libssl-dev
+
+      - name: Compile original source without deploying
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        working-directory: upstream
+        run: |
+          set -euo pipefail
+          case "$TARGET" in
+            math)
+              mvn --batch-mode --no-transfer-progress -DskipTests -pl immutable -am package
+              ;;
+            natives)
+              mvn --batch-mode --no-transfer-progress -DskipTests package
+              ;;
+            raknet)
+              chmod +x gradlew
+              ./gradlew :transport-raknet:assemble --no-daemon
+              ;;
+            nethernet)
+              chmod +x gradlew
+              ./gradlew :transport-nethernet:assemble --no-daemon
+              ;;
+            okaeri)
+              mvn --batch-mode --no-transfer-progress -DskipTests -pl yaml-snakeyaml -am package
+              ;;
+            libdatachannel)
+              chmod +x gradlew
+              ./gradlew jar --no-daemon -Plibdatachannel.targets=linux-glibc-x86_64
+              ;;
+            *)
+              echo "Unknown build target: $TARGET" >&2; exit 1
+              ;;
+          esac
+
+      - name: List original build results
+        shell: bash
+        run: |
+          set -euo pipefail
+          find upstream -path '*/build/libs/*.jar' -o -path '*/target/*.jar' | head -60
+          count=$(find upstream \( -path '*/build/libs/*.jar' -o -path '*/target/*.jar' \) | wc -l)
+          test "$count" -gt 0
+
+      - name: Upload original-source compile candidates (NOT published)
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            upstream/**/build/libs/*.jar
+            upstream/**/target/*.jar
+          retention-days: 3
+          if-no-files-found: error
