@@ -82,6 +82,9 @@ jobs:
           set -euo pipefail
           case "$TARGET" in
             math)
+              # The historic source pins a vanished Maven shade SNAPSHOT.
+              # Use the equivalent released plugin only in this CI checkout.
+              sed -i 's/<version>3.3.0-SNAPSHOT<\/version>/<version>3.3.0<\/version>/' immutable/pom.xml
               mvn --batch-mode --no-transfer-progress -DskipTests -pl immutable -am package
               ;;
             natives)
@@ -93,6 +96,9 @@ jobs:
               mvn --batch-mode --no-transfer-progress -DskipTests -Dantrun.skip=true package
               ;;
             raknet)
+              # The historical foojay 0.4 plugin does not work with
+              # the current Gradle resolver; change only checkout tooling.
+              sed -i 's/foojay-resolver-convention") version "0.4.0"/foojay-resolver-convention") version "1.0.0"/' settings.gradle.kts
               chmod +x gradlew
               ./gradlew :transport-raknet:assemble --no-daemon
               ;;
