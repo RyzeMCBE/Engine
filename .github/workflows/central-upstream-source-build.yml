@@ -91,6 +91,7 @@ jobs:
               # Old Natives 1.0.3 Maven script invokes make with no Makefile.
               # Build JNI from its original CMake sources, then let Maven
               # package Java without invoking that broken legacy Ant task.
+              sed -i 's/cmake_policy(SET CMP0048 OLD)/cmake_policy(SET CMP0048 NEW)/' CMakeLists.txt
               cmake -S . -B build-native -DCMAKE_POLICY_VERSION_MINIMUM=3.5
               cmake --build build-native --parallel 2
               mvn --batch-mode --no-transfer-progress -DskipTests -Dantrun.skip=true package
