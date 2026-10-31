@@ -53,14 +53,17 @@ dependencies {
     // links RakDisconnectReason, removed from Cloudburst RakNet 2.x.
     api(libs.nethernet.transport) { exclude(group = "io.netty") }
     // Only the Linux glibc x86_64 native WebRTC transport is bundled.
-    runtimeOnly("dev.opencollab:libdatachannel-java:${libs.versions.libdatachannel.get()}:linux-glibc-x86_64")
+    // The native runtime belongs to the executable distribution, not the developer SDK POM.
+    if (!centralRelease) runtimeOnly("dev.opencollab:libdatachannel-java:${libs.versions.libdatachannel.get()}:linux-glibc-x86_64")
     api("io.netty:netty-codec-http:${libs.versions.netty.get()}")
     runtimeOnly("io.netty:netty-transport-native-epoll:${libs.versions.netty.get()}:linux-x86_64")
     runtimeOnly("io.netty:netty-transport-native-epoll:${libs.versions.netty.get()}:linux-aarch_64")
     api(libs.fastreflect)
     api(libs.oshi)
     api(libs.flatlaf)
-    api(libs.formsrt)
+    // Dashboard needs the original JetBrains GUI runtime when running Engine GUI,
+    // but consumer plugins compiling against engine-server do not need it transitively.
+    if (centralRelease) compileOnly(libs.formsrt) else api(libs.formsrt)
     api(libs.sentry)
     api(libs.jctools)
     api(libs.caffeine)
