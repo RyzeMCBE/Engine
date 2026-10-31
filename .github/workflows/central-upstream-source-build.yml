@@ -21,7 +21,7 @@ jobs:
         include:
           - target: math
             repository: CloudburstMC/math
-            sha: aa0f810e3f1c12afbf0b6b30354d7cf8ed6ea0b3
+            sha: 87f24259a74a5ed690251fcc940b97f3fb540e47
             java: '11'
           - target: natives
             repository: CloudburstMC/Natives
@@ -85,7 +85,12 @@ jobs:
               mvn --batch-mode --no-transfer-progress -DskipTests -pl immutable -am package
               ;;
             natives)
-              mvn --batch-mode --no-transfer-progress -DskipTests package
+              # Old Natives 1.0.3 Maven script invokes make with no Makefile.
+              # Build JNI from its original CMake sources, then let Maven
+              # package Java without invoking that broken legacy Ant task.
+              cmake -S . -B build-native -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+              cmake --build build-native --parallel 2
+              mvn --batch-mode --no-transfer-progress -DskipTests -Dantrun.skip=true package
               ;;
             raknet)
               chmod +x gradlew
