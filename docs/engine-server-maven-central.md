@@ -65,3 +65,23 @@ transitivas de terceros estén disponibles en Maven Central.
 
 **No ejecutar `publishToMavenCentral` antes de completar esta lista.**
 No se reemplazan ni retaggean versiones ya publicadas.
+
+## Resultado del control real de Maven Central (31-10-2026)
+
+El CI ahora verifica las dependencias directas del POM mediante
+`.github/scripts/audit-central-resolution.py`, sin publicar.
+
+La publicación de `engine-server` sigue bloqueada: cuatro bibliotecas
+de terceros no se resuelven con `mavenCentral()` (HTTP 404):
+
+- `org.cloudburstmc.netty:netty-transport-nethernet:2.0.0.CR6-20261026.130552-16`
+- `com.jetbrains.intellij.java:java-gui-forms-rt:261.24374.191`
+- `eu.okaeri:okaeri-configs-yaml-snakeyaml:5.0.13`
+- `dev.opencollab:libdatachannel-java:0.24.6.0-20261023.142230-9`
+
+Además faltan publicaciones de primer nivel de Protocol y StateUpdater.
+Resolver las versiones externas mediante alternativas compatibles de Central
+o módulos propios compilados de fuentes con licencias auditadas, sin eliminar
+a ciegas librerías de protocolo, RTC o persistencia. La disponibilidad de
+dependencias directas **no verifica toda la transitividad**; después habrá
+que probar un consumidor independiente solo con Maven Central.
