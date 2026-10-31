@@ -9,7 +9,7 @@ NOTICE original. No usar coordenadas originales de otro propietario.
 
 | Módulo | Fuente original | SHA de referencia | Licencia |
 |---|---|---|---|
-| Math immutable/API | https://github.com/CloudburstMC/math | `aa0f810e3f1c12afbf0b6b30354d7cf8ed6ea0b3` | MIT |
+| Math immutable/API | https://github.com/CloudburstMC/math | `87f24259a74a5ed690251fcc940b97f3fb540e47` | MIT |
 | Natives/Zlib | https://github.com/CloudburstMC/Natives | `41826fe18358f7358707dc55e698abc16cdcc49a` | Apache-2.0 |
 | RakNet compatible | https://github.com/CloudburstMC/Network | `78a3224e829f2c4bcfe5a298320477d2f46ce6fa` | Apache-2.0 |
 | NetherNet | https://github.com/CloudburstMC/Network | `247cdfda6ec02cfef75bbdc9704ad1961245d6fb` | Apache-2.0 |
@@ -73,3 +73,15 @@ bajo nuestra firma sin comprobar expresamente términos y fuentes.
 
 Estado actual: los PR #7 de Protocol y #53 de Engine permanecen
 **bloqueados** hasta corregir dependencias y completar estas pruebas.
+
+## Ajustes de compilación original
+
+El proyecto Natives 1.0.3 contiene un perfil Maven Linux heredado que
+intenta ejecutar `make` sin que exista Makefile. El flujo de prueba usa
+CMake sobre el código nativo original y `-Dantrun.skip=true` para evitar
+ese paso antiguo; hay que inspeccionar el JAR y el empaquetado JNI antes de
+publicar, incluyendo la prueba de carga de la biblioteca compartida.
+
+El commit Math ahora apunta al árbol de 27 de marzo de 2022,
+inmediatamente anterior al snapshot `2.0-20220327.162752-1`, y no a
+cambios posteriores de diciembre de 2022.
