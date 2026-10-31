@@ -37,6 +37,12 @@ jobs:
           ./gradlew :server:generatePomFileForMavenPublication \
             -PcentralRelease=true --no-daemon
           python3 .github/scripts/verify-central-server-pom.py
+          python3 .github/scripts/audit-central-resolution.py \
+            --pending io.github.ryzemcbe:bedrock-connection:1.26.60-R1 \
+            --pending io.github.ryzemcbe:common:0.1.1 \
+            --pending io.github.ryzemcbe:block-updater:1.26.60-R1 \
+            --pending io.github.ryzemcbe:item-updater:1.26.50-R1 \
+            server/build/publications/maven/pom-default.xml
 
       - name: Verificar un plugin binario de Allay sin recompilarlo para Engine
         if: github.event_name == 'pull_request'
