@@ -40,8 +40,8 @@ jobs:
       - name: Verify unchanged RyzeMCBE original GPG key, format and password
         shell: bash
         env:
-          PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY || secrets.ENGINE_CENTRAL_GPG_PRIVATE_KEY }}
+          PASSPHRASE: ${{ secrets.GPG_PASSPHRASE || secrets.ENGINE_CENTRAL_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
           expected='0DE435F45DAAE3CCB759E01B32F428403DE9E4D8'
@@ -162,11 +162,12 @@ jobs:
         if: inputs.operation == 'upload'
         shell: bash
         env:
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY || secrets.ENGINE_CENTRAL_GPG_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE || secrets.ENGINE_CENTRAL_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
           ./gradlew -p vendor-central clean build \
+            :ryze-libdatachannel-java:smokeOriginalRtcNative \
             :ryze-transport-common:signMavenPublication \
             :ryze-netty-transport-nethernet:signMavenPublication \
             :ryze-okaeri-configs-core:signMavenPublication \
@@ -206,10 +207,10 @@ jobs:
         if: inputs.operation == 'upload'
         shell: bash
         env:
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
-          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
-          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY || secrets.ENGINE_CENTRAL_GPG_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE || secrets.ENGINE_CENTRAL_GPG_PASSPHRASE }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME || secrets.ENGINE_CENTRAL_TOKEN_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD || secrets.ENGINE_CENTRAL_TOKEN_PASSWORD }}
         run: |
           set -euo pipefail
           test -n "$ORG_GRADLE_PROJECT_mavenCentralUsername"

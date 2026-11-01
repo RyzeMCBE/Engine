@@ -4,6 +4,13 @@
 > NO publicado, NO ejecutar la subida antes de cumplir todas las puertas
 > de validación. Un upload a Sonatype **no significa** que sea público.
 
+Comprobación pública del 1 de noviembre de 2026: Engine API 0.30.0,
+los tres módulos de StateUpdater y las cuatro bibliotecas originales de
+Protocol ya tienen POM/JAR públicos (HTTP 200). Los dos módulos Bedrock,
+los cinco complementos de Engine y Engine Server aún devolvían HTTP 404.
+El estado **PUBLISHED** de las cuatro bibliotecas de la captura no publica
+automáticamente `bedrock-codec` ni `bedrock-connection`.
+
 La biblioteca destinada a desarrolladores es:
 
 ```kotlin
@@ -78,14 +85,64 @@ Reutilizar los valores originales ya disponibles en el VPS; nunca
 enviarlos por chats, documentación o comentarios de PR.
 No generar una firma alternativa.
 
+Los workflows reutilizan automáticamente los secretos de la publicación
+anterior de Engine API si no están definidos los nombres del entorno:
+
+| Secreto del entorno | Secreto existente de Engine API |
+|---|---|
+| `GPG_PRIVATE_KEY` | `ENGINE_CENTRAL_GPG_PRIVATE_KEY` |
+| `GPG_PASSPHRASE` | `ENGINE_CENTRAL_GPG_PASSPHRASE` |
+| `MAVEN_CENTRAL_USERNAME` | `ENGINE_CENTRAL_TOKEN_USERNAME` |
+| `MAVEN_CENTRAL_PASSWORD` | `ENGINE_CENTRAL_TOKEN_PASSWORD` |
+
+La huella se comprueba también al usar estos secretos existentes. Las
+firmas públicas de Engine API y de las bibliotecas de la captura
+identifican la misma clave `32F428403DE9E4D8`.
+
 Después de fusionar el PR validado en `main`, abrir
 [Actions](https://github.com/RyzeMCBE/Engine/actions) y ejecutar
 primero `Maven Central - Engine original-source dependencies`
 con `operation=verify-signature`; también usar
 `Maven Central - Engine Server` con esa misma operación.
 Ambas pruebas verifican huella y firma sin subir archivos.
+Cuando Protocol y los cinco complementos estén públicos, ejecutar
+`Maven Central - Engine Server` con `operation=verify-release`:
+compila, prueba, inspecciona JAR/sources/Javadoc/metadatos y resuelve
+toda la transitividad usando solo Central, sin utilizar la clave privada.
 La subida requiere escoger `upload` y escribir la confirmación exacta
 mostrada en la pantalla del workflow.
+
+### Secuencia desde el VPS ya autenticado con GitHub CLI
+
+```bash
+# 1. Los cuatro prerrequisitos de Protocol ya están públicos.
+gh workflow run publish-protocol-central.yml --repo RyzeMCBE/Protocol \
+  --ref main -f confirmation=ENVIAR-PROTOCOL
+
+# 2. Tras revisar y publicar Protocol en Sonatype, y fusionar Engine PR #53:
+gh workflow run publish-central-vendor.yml --repo RyzeMCBE/Engine \
+  --ref main -f operation=verify-signature
+gh workflow run publish-central-server.yml --repo RyzeMCBE/Engine \
+  --ref main -f operation=verify-signature
+
+# 3. Solo tras verificar la firma original:
+gh workflow run publish-central-vendor.yml --repo RyzeMCBE/Engine \
+  --ref main -f operation=upload -f confirmation=ENVIAR-ENGINE-DEPS
+
+# 4. Tras publicar los cinco complementos y comprobar su propagación:
+gh workflow run publish-central-server.yml --repo RyzeMCBE/Engine \
+  --ref main -f operation=verify-release
+
+# 5. Solo si la verificación de release anterior terminó correctamente:
+gh workflow run publish-central-server.yml --repo RyzeMCBE/Engine \
+  --ref main -f operation=upload -f confirmation=ENVIAR-ENGINE-SERVER
+
+# 6. Tras publicar Engine Server y comprobar su propagación:
+gh workflow run verify-central-consumer.yml --repo RyzeMCBE/Engine --ref main
+```
+
+Esperar a que cada ejecución termine correctamente y publicar su
+deployment en Sonatype antes de pasar a la siguiente etapa.
 
 No enviar artefactos si falla cualquier verificación. Revisar el
 deployment USER_MANAGED en
@@ -95,6 +152,7 @@ https://central.sonatype.com/publishing/deployments antes de pulsar Publish.
 
 ```bash
 # Modo opt-in de publicación; jamás modifica el ejecutable normal.
+python3 .github/scripts/check-central-server-prerequisites.py
 ./gradlew :server:generatePomFileForMavenPublication \
   -PcentralRelease=true --no-daemon
 python3 .github/scripts/verify-central-server-pom.py
@@ -111,6 +169,9 @@ El workflow final de Engine comprueba POM, transitividad mediante Maven
 aislado y mirror exclusivo de Central, JAR, sources, Javadoc y firmas
 GPG. Una prueba de integración de HCF y de arranque de NetherNet en
 servidor real sigue siendo necesaria para certificar ejecución de plugins.
+El SDK excluye expresamente la variante Shadow de los metadatos Gradle.
+Antes de subir, se verifica criptográficamente la firma de cada POM,
+JAR, fuentes, Javadoc y metadatos con la clave pública original.
 
 ## Comprobación final pública
 

@@ -19,6 +19,16 @@ application {
 val centralRelease = providers.gradleProperty("centralRelease")
     .map(String::toBoolean).getOrElse(false)
 
+if (centralRelease) {
+    // Shadow adds its executable as an optional published Java variant by default.
+    shadow {
+        addShadowVariantIntoJavaComponent = false
+    }
+    tasks.withType<Jar>().configureEach {
+        from(rootProject.file("LICENSE")) { into("META-INF") }
+    }
+}
+
 // The standard Java JAR can be published with sources and Javadoc;
 // the executable shaded JAR remains a separate runtime artifact.
 tasks.withType<Javadoc>().configureEach {

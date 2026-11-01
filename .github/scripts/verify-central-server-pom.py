@@ -27,6 +27,8 @@ expected = {
     ("io.github.ryzemcbe", "common"): "0.1.1",
     ("io.github.ryzemcbe", "block-updater"): "1.26.60-R1",
     ("io.github.ryzemcbe", "item-updater"): "1.26.50-R1",
+    ("io.github.ryzemcbe", "ryze-netty-transport-nethernet"): "2.0.0.CR6-ryze.1",
+    ("io.github.ryzemcbe", "ryze-okaeri-configs-yaml-snakeyaml"): "5.0.13-ryze.1",
 }
 for coordinate, version in expected.items():
     assert deps.get(coordinate) == version, (
@@ -35,4 +37,8 @@ for coordinate, version in expected.items():
 assert ("org.allaymc.allay", "api") not in deps, (
     "Legacy internal Allay API must not leak into the published POM")
 assert ("org.allaymc.protocol", "bedrock-connection") not in deps
+for (group, artifact), version in deps.items():
+    assert version and "SNAPSHOT" not in version.upper(), ("Non-release dependency", group, artifact, version)
+    assert group not in {"com.jetbrains.intellij.java", "dev.opencollab", "eu.okaeri"}, (
+        "Non-Central runtime dependency leaked into the SDK", group, artifact)
 print("Engine server publication POM verified (transitive Central closure is a separate gate).")
