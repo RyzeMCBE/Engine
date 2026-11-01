@@ -1,0 +1,224 @@
+name: Maven Central - Engine original-source dependencies (manual signed)
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'verify-signature is safe and does NOT upload anything'
+        type: choice
+        options:
+          - verify-signature
+          - upload
+        required: true
+      confirmation:
+        description: 'For upload only, type ENVIAR-ENGINE-DEPS'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-vendor-central-signed
+  cancel-in-progress: false
+
+jobs:
+  signed-vendor:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (inputs.operation == 'verify-signature' ||
+      (inputs.operation == 'upload' && inputs.confirmation == 'ENVIAR-ENGINE-DEPS'))
+    environment: maven-central
+    runs-on: ubuntu-22.04
+    timeout-minutes: 85
+    steps:
+      - name: Checkout reviewed Engine main without persisted credentials
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify unchanged RyzeMCBE original GPG key, format and password
+        shell: bash
+        env:
+          PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY || secrets.ENGINE_CENTRAL_GPG_PRIVATE_KEY }}
+          PASSPHRASE: ${{ secrets.GPG_PASSPHRASE || secrets.ENGINE_CENTRAL_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          expected='0DE435F45DAAE3CCB759E01B32F428403DE9E4D8'
+          test -n "$PRIVATE_KEY" && test -n "$PASSPHRASE" || {
+            echo '::error::Original GPG key/passphrase missing in maven-central environment'; exit 1;
+          }
+          [[ "$PRIVATE_KEY" == *'-----BEGIN PGP PRIVATE KEY BLOCK-----'* &&
+             "$PRIVATE_KEY" == *'-----END PGP PRIVATE KEY BLOCK-----'* ]] || {
+               echo '::error::Expected complete ASCII-armored original PRIVATE key'; exit 1;
+          }
+          export GNUPGHOME="$(mktemp -d)"
+          chmod 700 "$GNUPGHOME"
+          trap 'rm -rf "$GNUPGHOME"' EXIT
+          printf '%s\n' "$PRIVATE_KEY" | gpg --batch --quiet --import >/dev/null 2>&1 || exit 1
+          gpg --batch --with-colons --list-secret-keys "$expected" |
+            awk -F: -v expected="$expected" '$1=="fpr" && $10==expected {ok=1} END{exit !ok}' || {
+              echo '::error::Original RyzeMCBE fingerprint did not match'; exit 1;
+            }
+          printf 'Engine original-source dependency signature test\n' |
+            gpg --batch --quiet --yes --pinentry-mode loopback --passphrase-fd 3 --local-user "$expected" --detach-sign --output /dev/null 3<<<"$PASSPHRASE"
+          echo 'PASS: Original RyzeMCBE GPG identity and signing works'
+
+      - name: Exit safely after signature-only test
+        if: inputs.operation == 'verify-signature'
+        run: echo 'PASS GPG - NO modules built, signed for release or uploaded'
+
+      - name: Check all proposed immutable versions are unpublished
+        if: inputs.operation == 'upload'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for module in \
+            'ryze-transport-common:2.0.0.CR6-ryze.1' \
+            'ryze-netty-transport-nethernet:2.0.0.CR6-ryze.1' \
+            'ryze-okaeri-configs-core:5.0.13-ryze.1' \
+            'ryze-okaeri-configs-yaml-snakeyaml:5.0.13-ryze.1' \
+            'ryze-libdatachannel-java:0.24.6.0-ryze.1'; do
+            artifact="${module%%:*}"
+            version="${module#*:}"
+            url="https://repo.maven.apache.org/maven2/io/github/ryzemcbe/$artifact/$version/$artifact-$version.pom"
+            status="$(curl --silent --show-error --location --max-time 25 --output /dev/null --write-out '%{http_code}' "$url")"
+            [[ "$status" == 404 ]] || {
+              echo "::error::Cannot upload immutable $module: expected HTTP404, received HTTP$status"; exit 1;
+            }
+          done
+
+      - name: Checkout pinned Cloudburst NetherNet source
+        if: inputs.operation == 'upload'
+        uses: actions/checkout@v7
+        with:
+          repository: CloudburstMC/Network
+          ref: 247cdfda6ec02cfef75bbdc9704ad1961245d6fb
+          path: vendor-upstream/nethernet
+          persist-credentials: false
+
+      - name: Checkout pinned Okaeri source
+        if: inputs.operation == 'upload'
+        uses: actions/checkout@v7
+        with:
+          repository: OkaeriPoland/okaeri-configs
+          ref: b20e94ea63fc3089bb892318ad305792a72274f9
+          path: vendor-upstream/okaeri
+          persist-credentials: false
+
+      - name: Checkout pinned original WebRTC Java and native sources
+        if: inputs.operation == 'upload'
+        uses: actions/checkout@v7
+        with:
+          repository: opencollab-incubator/libdatachannel-java
+          ref: 0eb42beb7f7b17e8b383ea848a52d1c2da0c8e7c
+          submodules: recursive
+          path: vendor-upstream/libdatachannel
+          persist-credentials: false
+
+      - name: Check exact upstream commits, original licenses and native source
+        if: inputs.operation == 'upload'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C vendor-upstream/nethernet rev-parse HEAD)" = 247cdfda6ec02cfef75bbdc9704ad1961245d6fb
+          test "$(git -C vendor-upstream/okaeri rev-parse HEAD)" = b20e94ea63fc3089bb892318ad305792a72274f9
+          test "$(git -C vendor-upstream/libdatachannel rev-parse HEAD)" = 0eb42beb7f7b17e8b383ea848a52d1c2da0c8e7c
+          test -s vendor-upstream/nethernet/LICENSE
+          test -s vendor-upstream/okaeri/LICENSE
+          grep -q 'Mozilla Public License Version 2.0' vendor-upstream/libdatachannel/LICENSE
+          test -s vendor-upstream/libdatachannel/jni/build-linux.sh
+
+      - name: Setup Java 21
+        if: inputs.operation == 'upload'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle
+        if: inputs.operation == 'upload'
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build ORIGINAL Linux glibc x86_64 JNI with exact pinned source
+        if: inputs.operation == 'upload'
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew -p vendor-upstream/libdatachannel jar packageNativeForLinuxGlibcX8664 \
+            -Plibdatachannel.targets=linux-glibc-x86_64 \
+            -Plibdatachannel.build-release-binaries=true \
+            --max-workers=2 --no-daemon
+          native="$(find vendor-upstream/libdatachannel/build/libs -maxdepth 1 -name '*linux-glibc-x86_64.jar' -print -quit)"
+          test -s "$native"
+          jar tf "$native" | grep -qx 'native/libdatachannel-java.so'
+          mkdir -p vendor-native-inspection
+          (cd vendor-native-inspection && jar xf "../$native" native/libdatachannel-java.so)
+          file vendor-native-inspection/native/libdatachannel-java.so | grep -q 'ELF 64-bit LSB shared object, x86-64'
+          ldd -r vendor-native-inspection/native/libdatachannel-java.so
+
+      - name: Compile FIVE source-built vendor modules and GPG-sign JAR/POM/sources/Javadoc/JNI
+        if: inputs.operation == 'upload'
+        shell: bash
+        env:
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY || secrets.ENGINE_CENTRAL_GPG_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE || secrets.ENGINE_CENTRAL_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          ./gradlew -p vendor-central clean build \
+            :ryze-libdatachannel-java:smokeOriginalRtcNative \
+            :ryze-transport-common:signMavenPublication \
+            :ryze-netty-transport-nethernet:signMavenPublication \
+            :ryze-okaeri-configs-core:signMavenPublication \
+            :ryze-okaeri-configs-yaml-snakeyaml:signMavenPublication \
+            :ryze-libdatachannel-java:signMavenPublication \
+            -PvendorCentralRelease=true --no-daemon
+
+      - name: Verify five Maven distributions, all source licenses and signed JNI
+        if: inputs.operation == 'upload'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for module in ryze-transport-common ryze-netty-transport-nethernet ryze-okaeri-configs-core ryze-okaeri-configs-yaml-snakeyaml ryze-libdatachannel-java; do
+            folder="vendor-central/$module/build"
+            test -s "$folder/publications/maven/pom-default.xml"
+            grep -q '<licenses>' "$folder/publications/maven/pom-default.xml"
+            test -n "$(find "$folder/libs" -maxdepth 1 -name '*sources.jar' -print -quit)"
+            test -n "$(find "$folder/libs" -maxdepth 1 -name '*javadoc.jar' -print -quit)"
+            count="$(find "$folder" -type f -name '*.asc' | wc -l)"
+            if [[ "$module" == 'ryze-libdatachannel-java' ]]; then
+              test "$count" -ge 5 || { echo "::error::Unsigned native classifier in $module"; exit 1; }
+              native="$(find "$folder/libs" -maxdepth 1 -name '*linux-glibc-x86_64.jar' -print -quit)"
+              test -s "$native"
+              jar tf "$native" | grep -qx 'native/libdatachannel-java.so'
+            else
+              test "$count" -ge 4 || { echo "::error::Missing GPG signed artifacts in $module"; exit 1; }
+            fi
+            echo "PASS: $module signed release bundle"
+          done
+          python3 .github/scripts/audit-central-resolution.py \
+            --pending io.github.ryzemcbe:ryze-transport-common:2.0.0.CR6-ryze.1 \
+            --pending io.github.ryzemcbe:ryze-libdatachannel-java:0.24.6.0-ryze.1 \
+            --pending io.github.ryzemcbe:ryze-okaeri-configs-core:5.0.13-ryze.1 \
+            vendor-central/*/build/publications/maven/pom-default.xml
+
+      - name: Upload five signed source-built vendor modules to Sonatype USER_MANAGED
+        if: inputs.operation == 'upload'
+        shell: bash
+        env:
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY || secrets.ENGINE_CENTRAL_GPG_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE || secrets.ENGINE_CENTRAL_GPG_PASSPHRASE }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME || secrets.ENGINE_CENTRAL_TOKEN_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD || secrets.ENGINE_CENTRAL_TOKEN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ORG_GRADLE_PROJECT_mavenCentralUsername"
+          test -n "$ORG_GRADLE_PROJECT_mavenCentralPassword"
+          ./gradlew -p vendor-central publishToMavenCentral -PvendorCentralRelease=true --no-daemon
+
+      - name: Review deployment in Sonatype and Publish MANUALLY
+        if: inputs.operation == 'upload'
+        run: |
+          echo 'Signed original-source modules were uploaded as USER_MANAGED. NOT PUBLISHED automatically.'
+          echo 'Verify all five modules and JNI classifier under https://central.sonatype.com/publishing/deployments'

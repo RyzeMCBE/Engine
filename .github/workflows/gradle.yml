@@ -20,6 +20,8 @@ jobs:
           submodules: recursive
       - name: Verificar dependencias enlazadas
         run: bash .github/scripts/check-linked-dependencies.sh
+      - name: Verify SDK publication rejects shaded variants and missing prerequisites
+        run: python3 .github/scripts/test-central-server-publication.py
       - name: Set up Java 21
         uses: actions/setup-java@v6
         with:
@@ -31,6 +33,19 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew build --no-daemon
+      - name: Auditar POM del Engine Server para Maven Central (sin publicar)
+        shell: bash
+        run: |
+          ./gradlew :server:generatePomFileForMavenPublication \
+            -PcentralRelease=true --no-daemon
+          python3 .github/scripts/verify-central-server-pom.py
+          python3 .github/scripts/audit-central-resolution.py \
+            --pending io.github.ryzemcbe:bedrock-connection:1.26.60-R1 \
+            --pending io.github.ryzemcbe:ryze-netty-transport-nethernet:2.0.0.CR6-ryze.1 \
+            --pending io.github.ryzemcbe:ryze-okaeri-configs-yaml-snakeyaml:5.0.13-ryze.1 \
+            server/build/publications/maven/pom-default.xml
+          echo "::notice::PR-only integration: pending organization-owned modules allowed; FINAL release workflow rejects ALL pending public dependencies."
+
       - name: Verificar un plugin binario de Allay sin recompilarlo para Engine
         if: github.event_name == 'pull_request'
         run: bash .github/scripts/smoke-legacy-plugin.sh

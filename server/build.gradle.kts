@@ -14,13 +14,43 @@ application {
     mainClass.set("org.allaymc.server.Allay")
 }
 
+// Publish the ordinary Java component, not shadowJar.
+// Central mode is opt-in and only after matching Protocol/StateUpdater releases exist.
+val centralRelease = providers.gradleProperty("centralRelease")
+    .map(String::toBoolean).getOrElse(false)
+
+if (centralRelease) {
+    // Shadow adds its executable as an optional published Java variant by default.
+    shadow {
+        addShadowVariantIntoJavaComponent = false
+    }
+    tasks.withType<Jar>().configureEach {
+        from(rootProject.file("LICENSE")) { into("META-INF") }
+    }
+}
+
+// The standard Java JAR can be published with sources and Javadoc;
+// the executable shaded JAR remains a separate runtime artifact.
+tasks.withType<Javadoc>().configureEach {
+    enabled = centralRelease
+    isFailOnError = false
+    (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
+}
+
 dependencies {
-    api(project(":api"))
+    if (centralRelease) api("io.github.ryzemcbe:engine-api:0.30.0")
+    else api(project(":api"))
     api(libs.bundles.logging)
     api(libs.bundles.leveldb)
     api(libs.bundles.rng)
     api(libs.bundles.fastutil)
-    api(libs.bundles.stateupdater)
+    if (centralRelease) {
+        api("io.github.ryzemcbe:common:0.1.1")
+        api("io.github.ryzemcbe:item-updater:1.26.50-R1")
+        api("io.github.ryzemcbe:block-updater:1.26.60-R1")
+    } else {
+        api(libs.bundles.stateupdater)
+    }
     api(libs.semver4j)
     api(libs.commonslang3)
     api(libs.commonsio)
@@ -31,26 +61,49 @@ dependencies {
     api(libs.netty.kqueue)
     // Preserve the Protocol submodule's older RakNet API: BedrockPeer still
     // links RakDisconnectReason, removed from Cloudburst RakNet 2.x.
-    api(libs.nethernet.transport) { exclude(group = "io.netty") }
+    if (centralRelease) {
+        api("io.github.ryzemcbe:ryze-netty-transport-nethernet:2.0.0.CR6-ryze.1") {
+            exclude(group = "io.netty")
+        }
+    } else {
+        api(libs.nethernet.transport) { exclude(group = "io.netty") }
+    }
     // Only the Linux glibc x86_64 native WebRTC transport is bundled.
-    runtimeOnly("dev.opencollab:libdatachannel-java:${libs.versions.libdatachannel.get()}:linux-glibc-x86_64")
+    // The native runtime belongs to the executable distribution, not the developer SDK POM.
+    if (!centralRelease) runtimeOnly("dev.opencollab:libdatachannel-java:${libs.versions.libdatachannel.get()}:linux-glibc-x86_64")
     api("io.netty:netty-codec-http:${libs.versions.netty.get()}")
     runtimeOnly("io.netty:netty-transport-native-epoll:${libs.versions.netty.get()}:linux-x86_64")
     runtimeOnly("io.netty:netty-transport-native-epoll:${libs.versions.netty.get()}:linux-aarch_64")
     api(libs.fastreflect)
     api(libs.oshi)
     api(libs.flatlaf)
-    api(libs.formsrt)
+    // Dashboard needs the original JetBrains GUI runtime when running Engine GUI,
+    // but consumer plugins compiling against engine-server do not need it transitively.
+    if (centralRelease) compileOnly(libs.formsrt) else api(libs.formsrt)
     api(libs.sentry)
     api(libs.jctools)
     api(libs.caffeine)
-    api(libs.protocol) {
-        exclude(group = "org.cloudburstmc", module = "nbt") // Use allaymc's nbt library
-        exclude(group = "org.cloudburstmc.fastutil.commons")
-        exclude(group = "org.cloudburstmc.fastutil.maps")
+    if (centralRelease) {
+        api("io.github.ryzemcbe:bedrock-connection:1.26.60-R1") {
+            exclude(group = "org.cloudburstmc", module = "nbt")
+            exclude(group = "org.cloudburstmc.fastutil.commons")
+            exclude(group = "org.cloudburstmc.fastutil.maps")
+        }
+    } else {
+        api(libs.protocol) {
+            exclude(group = "org.cloudburstmc", module = "nbt") // Use allaymc's nbt library
+            exclude(group = "org.cloudburstmc.fastutil.commons")
+            exclude(group = "org.cloudburstmc.fastutil.maps")
+        }
     }
-    api(libs.okaeri.configs.yaml.snakeyaml) {
-        exclude(group = "org.yaml", module = "snakeyaml") // Use the latest version
+    if (centralRelease) {
+        api("io.github.ryzemcbe:ryze-okaeri-configs-yaml-snakeyaml:5.0.13-ryze.1") {
+            exclude(group = "org.yaml", module = "snakeyaml") // Preserve Engine's SnakeYAML
+        }
+    } else {
+        api(libs.okaeri.configs.yaml.snakeyaml) {
+            exclude(group = "org.yaml", module = "snakeyaml") // Use the latest version
+        }
     }
     api(libs.bstats)
     api(libs.lz4.java)
