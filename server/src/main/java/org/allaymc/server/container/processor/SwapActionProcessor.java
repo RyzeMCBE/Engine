@@ -27,6 +27,11 @@ public class SwapActionProcessor implements ContainerActionProcessor<SwapAction>
         var sourceSlot = ContainerActionProcessor.fromNetworkSlotIndex(sourceContainer, action.source().slot());
         var destinationSlot = ContainerActionProcessor.fromNetworkSlotIndex(destinationContainer, action.destination().slot());
 
+        if (sourceContainer == destinationContainer && sourceSlot == destinationSlot) {
+            log.warn("Cannot swap a stack with itself");
+            return error();
+        }
+
         if (ContainerActionProcessor.tryHandleFakeContainer(sourceContainer, sourceSlot, destinationContainer, destinationSlot)) {
             return error();
         }
