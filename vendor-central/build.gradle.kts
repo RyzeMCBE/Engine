@@ -96,6 +96,13 @@ subprojects {
                 artifact(nativeDistribution)
             }
         }
+        tasks.register<JavaExec>("smokeOriginalRtcNative") {
+            group = "verification"
+            description = "Load the original JNI .so from the published-classifier layout using the Java API"
+            dependsOn(tasks.named("testClasses"), nativeDistribution)
+            classpath = sourceSets["test"].runtimeClasspath + files(nativeDistribution)
+            mainClass.set("org.ryzemcbe.central.OriginalRtcNativeLoadSmoke")
+        }
     }
     dependencies {
         when (project.name) {
