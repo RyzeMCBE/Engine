@@ -1,0 +1,77 @@
+name: Engine Central - original RTC JNI Linux x86_64 (NO PUBLISH)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/central-rtc-native.yml'
+      - 'vendor-central/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-rtc-native-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rtc-linux-glibc:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 55
+    steps:
+      - name: Checkout original pinned WebRTC Java and native sources
+        uses: actions/checkout@v7
+        with:
+          repository: opencollab-incubator/libdatachannel-java
+          ref: 0eb42beb7f7b17e8b383ea848a52d1c2da0c8e7c
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Verify original source, nested native repositories and MPL-2.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 0eb42beb7f7b17e8b383ea848a52d1c2da0c8e7c
+          grep -q 'Mozilla Public License Version 2.0' LICENSE
+          test -f jni/libdatachannel/CMakeLists.txt
+          test -f jni/build-linux.sh
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Compile the original Linux glibc x86_64 JNI library and classifier JAR
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew jar packageNativeForLinuxGlibcX8664 \
+            -Plibdatachannel.targets=linux-glibc-x86_64 \
+            -Plibdatachannel.build-release-binaries=true \
+            --max-workers=2 --no-daemon
+
+      - name: Verify Linux classifier, ELF architecture, linker and original Java API
+        shell: bash
+        run: |
+          set -euo pipefail
+          native_jar="$(find build/libs -maxdepth 1 -name '*linux-glibc-x86_64.jar' -print -quit)"
+          test -s "$native_jar"
+          jar tf "$native_jar" | grep -qx 'native/libdatachannel-java.so'
+          mkdir -p native-review
+          cd native-review
+          jar xf "../$native_jar" native/libdatachannel-java.so
+          file native/libdatachannel-java.so | grep -q 'ELF 64-bit LSB shared object, x86-64'
+          ldd -r native/libdatachannel-java.so
+          echo 'PASS: original Java and Linux glibc native classifier were compiled and linked.'
+      - name: Save original native library for compatibility review (NO PUBLISH)
+        uses: actions/upload-artifact@v7
+        with:
+          name: engine-rtc-jni-original-review-${{ github.sha }}
+          path: |
+            build/libs/*linux-glibc-x86_64.jar
+          retention-days: 7
+          if-no-files-found: error
