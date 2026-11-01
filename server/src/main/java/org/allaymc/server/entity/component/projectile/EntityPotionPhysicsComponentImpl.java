@@ -20,6 +20,7 @@ import org.joml.Vector3d;
 import org.joml.Vector3dc;
 import org.joml.Vector3i;
 import org.joml.primitives.AABBd;
+import org.joml.primitives.AABBdc;
 
 /**
  * Common base class for splash and lingering potion physics components.
@@ -88,8 +89,10 @@ public abstract class EntityPotionPhysicsComponentImpl extends EntityProjectileP
                     continue;
                 }
 
-                var pos = living.getLocation();
-                var distance = pos.distance(location);
+                // Splash strength is measured from the impact to the target's hitbox,
+                // not to the target's feet. Otherwise close body-level splashes
+                // can give substantially less healing than a direct collision.
+                var distance = distanceToBox(location, living.getOffsetAABB());
                 if (distance > 4) {
                     continue;
                 }
@@ -146,6 +149,14 @@ public abstract class EntityPotionPhysicsComponentImpl extends EntityProjectileP
                 entityBeingHit.onSplash();
             }
         }
+    }
+
+    /** Distance from the splash point to the nearest point on the target's bounding box. */
+    static double distanceToBox(Vector3dc point, AABBdc box) {
+        var dx = Math.max(Math.max(box.minX() - point.x(), 0.0), point.x() - box.maxX());
+        var dy = Math.max(Math.max(box.minY() - point.y(), 0.0), point.y() - box.maxY());
+        var dz = Math.max(Math.max(box.minZ() - point.z(), 0.0), point.z() - box.maxZ());
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 
     /**
