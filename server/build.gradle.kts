@@ -1,5 +1,6 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCacheFileTransformer
 import org.gradle.kotlin.dsl.support.serviceOf
+import org.gradle.jvm.tasks.Jar
 import java.io.ByteArrayOutputStream
 
 plugins {
