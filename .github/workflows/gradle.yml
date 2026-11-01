@@ -42,7 +42,10 @@ jobs:
             --pending io.github.ryzemcbe:common:0.1.1 \
             --pending io.github.ryzemcbe:block-updater:1.26.60-R1 \
             --pending io.github.ryzemcbe:item-updater:1.26.50-R1 \
+            --pending io.github.ryzemcbe:ryze-netty-transport-nethernet:2.0.0.CR6-ryze.1 \
+            --pending io.github.ryzemcbe:ryze-okaeri-configs-yaml-snakeyaml:5.0.13-ryze.1 \
             server/build/publications/maven/pom-default.xml
+          echo "::notice::PR-only integration: pending organization-owned modules allowed; FINAL release workflow rejects ALL pending public dependencies."
 
       - name: Verificar un plugin binario de Allay sin recompilarlo para Engine
         if: github.event_name == 'pull_request'
