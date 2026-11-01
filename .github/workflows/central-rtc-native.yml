@@ -78,7 +78,7 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x gradlew
-          ./gradlew -p vendor-central :ryze-libdatachannel-java:linuxGlibcX8664NativeJar \
+          ./gradlew -p vendor-central :ryze-libdatachannel-java:smokeOriginalRtcNative \
             -PvendorNativeClassifierTest=true --no-daemon
           packaged="$(find vendor-central/ryze-libdatachannel-java/build/libs -maxdepth 1 -name '*linux-glibc-x86_64.jar' -print -quit)"
           test -s "$packaged"
