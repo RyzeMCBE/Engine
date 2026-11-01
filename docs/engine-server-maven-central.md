@@ -1,15 +1,25 @@
 # Publicación de Engine Server en Maven Central
 
-> Estado: preparación técnica en [Engine PR #53](https://github.com/RyzeMCBE/Engine/pull/53).
+> Estado: [Engine PR #53](https://github.com/RyzeMCBE/Engine/pull/53) integrado.
 > NO publicado, NO ejecutar la subida antes de cumplir todas las puertas
 > de validación. Un upload a Sonatype **no significa** que sea público.
 
-Comprobación pública del 1 de noviembre de 2026: Engine API 0.30.0,
-los tres módulos de StateUpdater y las cuatro bibliotecas originales de
-Protocol ya tienen POM/JAR públicos (HTTP 200). Los dos módulos Bedrock,
-los cinco complementos de Engine y Engine Server aún devolvían HTTP 404.
-El estado **PUBLISHED** de las cuatro bibliotecas de la captura no publica
-automáticamente `bedrock-codec` ni `bedrock-connection`.
+Última comprobación pública del 1 de noviembre de 2026: Engine API 0.30.0,
+los tres módulos de StateUpdater, las cuatro bibliotecas originales de
+Protocol, sus dos módulos Bedrock y los cinco complementos de Engine
+ya tienen POM/JAR públicos (HTTP 200). También está público el clasificador
+JNI Linux glibc x86_64. Engine Server sigue pendiente de publicación.
+
+El primer `verify-release` compiló Java, pero el proceso de pruebas
+terminó al arrancar el servidor completo sin el JNI excluido del SDK.
+Ese clasificador se añade al runtime de **pruebas**, sin incluirlo en
+las dependencias publicadas del SDK. El workflow
+`verify-central-server-release.yml` comprueba ahora la variante real de
+release en los PR, usando las mismas comprobaciones que el envío manual.
+Los dos workflows conservan informes y logs de arranque aunque falle el build.
+También ejecutan expresamente `:server:plainJavadocJar` antes de inspeccionar
+el paquete: generar únicamente los metadatos de Gradle no ejecuta esa tarea
+adjunta a la publicación Maven.
 
 La biblioteca destinada a desarrolladores es:
 
