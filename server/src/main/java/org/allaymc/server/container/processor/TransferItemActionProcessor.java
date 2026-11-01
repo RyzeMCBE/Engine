@@ -34,6 +34,12 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         int destinationSlot = ContainerActionProcessor.fromNetworkSlotIndex(destinationContainer, action.destination().slot());
         int destinationStackNetworkId = action.destination().stackNetworkId();
 
+        // A client request cannot move a stack onto itself or transfer zero items.
+        if (action.count() <= 0 || (sourceContainer == destinationContainer && sourceSlot == destinationSlot)) {
+            log.warn("Invalid transfer count or identical source/destination slot");
+            return error();
+        }
+
         if (ContainerActionProcessor.tryHandleFakeContainer(sourceContainer, sourceSlot, destinationContainer, destinationSlot)) {
             return error();
         }
