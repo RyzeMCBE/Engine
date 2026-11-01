@@ -61,6 +61,15 @@ subprojects {
         isFailOnError = false
         (options as StandardJavadocDocletOptions).addBooleanOption("Xdoclint:none", true)
     }
+    // This module's JNI probe is a JavaExec main class, not a JUnit test.
+    // Gradle 9 otherwise fails the default Test task because it discovers
+    // test-source classes without @Test methods. The separate JNI smoke task
+    // MUST still execute in the native workflow.
+    if (project.name == "ryze-libdatachannel-java") {
+        tasks.withType<Test>().configureEach {
+            failOnNoDiscoveredTests.set(false)
+        }
+    }
     tasks.withType<Jar>().configureEach {
         from(sourceLicense) {
             into("META-INF")
