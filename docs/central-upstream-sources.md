@@ -1,7 +1,6 @@
 # Preparar bibliotecas de terceros desde sus repositorios originales
 
-Estado: **fuentes identificadas, preparadas para compilación de prueba; no
-publicadas**. La publicación bajo `io.github.ryzemcbe` debe conservar
+Estado: **los cinco candidatos Java compilaron y generaron POM/JAR/sources/Javadoc en CI, pero NO están publicados**. La prueba original de JNI Linux glibc x86_64 ha finalizado en verde. Las pruebas de firma y publicación firmada en Maven Central requieren el entorno y la aprobación manual del propietario. La publicación bajo `io.github.ryzemcbe` debe conservar
 paquetes Java binariamente compatibles, fuentes, licencia, autores y cualquier
 NOTICE original. No usar coordenadas originales de otro propietario.
 
@@ -22,17 +21,19 @@ publicados fuera de Central. La selección de RakNet se corresponde con el árbo
 que conserva `org.cloudburstmc.netty.channel.raknet.RakDisconnectReason`.
 NO sustituirla por una rama posterior que haya borrado ese tipo.
 
-Los artefactos de terceros necesitan nombres inequívocos bajo
-`io.github.ryzemcbe`, preferiblemente:
-- `ryze-cloudburst-math-immutable`
-- `ryze-nukkit-natives` (incluidas bibliotecas nativas necesarias)
-- `ryze-netty-transport-raknet`
-- `ryze-netty-transport-nethernet`
-- `ryze-okaeri-configs-core` y `ryze-okaeri-configs-yaml-snakeyaml`
-- `ryze-libdatachannel-java` y su classifier `linux-glibc-x86_64`
+Protocol ya preparó bajo `io.github.ryzemcbe` los artefactos
+`cloudburst-math-api`, `cloudburst-math-immutable`,
+`cloudburst-raknet` y `nukkit-natives-java`. Para Engine Server,
+se preparan estos cinco módulos independientes con nombres y versiones
+propios:
+- `ryze-transport-common:2.0.0.CR6-ryze.1`
+- `ryze-netty-transport-nethernet:2.0.0.CR6-ryze.1`
+- `ryze-okaeri-configs-core:5.0.13-ryze.1`
+- `ryze-okaeri-configs-yaml-snakeyaml:5.0.13-ryze.1`
+- `ryze-libdatachannel-java:0.24.6.0-ryze.1` con classifier JNI
+  `linux-glibc-x86_64`
 
-La lista es una propuesta de **identificadores de publicación**, NO coordenadas
-existentes. Publicar un proyecto con un groupId diferente sin actualizar sus
+Estas coordenadas son **candidatas compiladas, NO publicadas en Central**. Publicar un proyecto con un groupId diferente sin actualizar sus
 POMs y las referencias de Protocol/Engine no resuelve nada. Algunos proyectos
 dependen de otros módulos del mismo proyecto; publicarlos también o enlazarlos
 correctamente es obligatorio.
@@ -71,16 +72,21 @@ bajo nuestra firma sin comprobar expresamente términos y fuentes.
    scoreboard y HCF.
 6. El propietario publicará y aprobará el deployment en Sonatype.
 
-Estado actual: los PR #7 de Protocol y #53 de Engine permanecen
-**bloqueados** hasta corregir dependencias y completar estas pruebas.
+Estado actual: Protocol PR #7 se fusionó a main. Engine PR #53 sigue abierto;
+la publicación de ambos módulos Bedrock, de los cinco candidatos originales
+de Engine y de engine-server sigue bloqueada hasta publicación manual,
+HTTP 200 y pruebas de consumidor.
 
 ## Ajustes de compilación original
 
 El proyecto Natives 1.0.3 contiene un perfil Maven Linux heredado que
-intenta ejecutar `make` sin que exista Makefile. El flujo de prueba usa
-CMake sobre el código nativo original y `-Dantrun.skip=true` para evitar
-ese paso antiguo; hay que inspeccionar el JAR y el empaquetado JNI antes de
-publicar, incluyendo la prueba de carga de la biblioteca compartida.
+intenta ejecutar `make` sin que exista Makefile. El flujo de prueba compila el objetivo JNI preciso con CMake y ejecuta
+directamente los objetivos originales Maven Compiler y Maven JAR para evitar
+el antiguo `maven-antrun-plugin` que ejecuta make sin Makefile. Este
+ajuste conservó las fuentes originales y superó el job Natives.
+La verificación JNI de WebRTC usa el Gradle nativo original del proyecto,
+extrae el clasificador de Linux glibc x86_64 y ejecuta `ldd -r`.
+El JAR y su distribución compatible se preparan en `vendor-central`.
 
 El commit Math ahora apunta al árbol de 27 de marzo de 2022,
 inmediatamente anterior al snapshot `2.0-20220327.162752-1`, y no a
