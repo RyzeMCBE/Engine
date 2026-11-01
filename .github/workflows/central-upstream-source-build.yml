@@ -97,7 +97,11 @@ jobs:
               # package Java without invoking that broken legacy Ant task.
               sed -i 's/cmake_policy(SET CMP0048 OLD)/cmake_policy(SET CMP0048 NEW)/' CMakeLists.txt
               cmake -S . -B build-native -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-              cmake --build build-native --parallel 2
+              # Only the Nukkit AES/SHA JNI target is used here. Building every
+              # bundled zlib-ng target on modern GNU ld fails with an upstream
+              # duplicate 'static_ltree' symbol unrelated to Nukkit JNI.
+              cmake --build build-native --target nukkit-natives --parallel 2
+              test -s src/main/resources/libnukkit-natives.so
               mvn --batch-mode --no-transfer-progress -DskipTests -Dantrun.skip=true package
               ;;
             raknet)
