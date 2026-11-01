@@ -142,4 +142,43 @@ class ItemStackRequestTransferRecoveryTest {
         assertEquals(ItemAirStack.AIR_STACK, inventory.getItemStack(3));
         verify(player).viewContainerContents(chest);
     }
+
+    @Test
+    void committedChestTransferNotifiesSpectatorsAfterResponse() {
+        var player = playerWithResponses();
+        var spectator = mock(org.allaymc.api.container.ContainerViewer.class);
+        var chest = spy(new BaseContainer(ContainerTypes.CHEST));
+        var inventory = new BaseContainer(ContainerTypes.INVENTORY);
+        var item = DIAMOND.createItemStack(9);
+        chest.setItemStack(0, item, false);
+        doReturn(Map.of((byte) 1, player, (byte) 2, spectator)).when(chest).getViewers();
+
+        var source = new ItemStackRequestSlotData(ContainerSlotType.LEVEL_ENTITY, 0, item.getUniqueId(), CHEST_NAME);
+        var destination = new ItemStackRequestSlotData(ContainerSlotType.INVENTORY, 3, 0, INV_NAME);
+        var processor = new ItemStackRequestPacketProcessor() {
+            @Override boolean allowRequest(Player ignored, ItemStackRequestAction[] actions) { return true; }
+        };
+        processor.processorHolder.registerProcessor(new ContainerActionProcessor<PlaceAction>() {
+            @Override
+            public ActionResponse handle(PlaceAction action, Player p, int index, ItemStackRequestAction[] all, Map<String, Object> pool) {
+                chest.setItemStack(0, ItemAirStack.AIR_STACK, false);
+                inventory.setItemStack(3, item, false);
+                return new ActionResponse(true, List.of());
+            }
+            @Override public ItemStackRequestActionType getType() { return ItemStackRequestActionType.PLACE; }
+        });
+
+        try (var slots = mockStatic(ContainerActionProcessor.class)) {
+            slots.when(() -> ContainerActionProcessor.getContainerFrom(player, CHEST_NAME)).thenReturn(chest);
+            slots.when(() -> ContainerActionProcessor.getContainerFrom(player, INV_NAME)).thenReturn(inventory);
+            slots.when(() -> ContainerActionProcessor.fromNetworkSlotIndex(chest, 0)).thenReturn(0);
+            slots.when(() -> ContainerActionProcessor.fromNetworkSlotIndex(inventory, 3)).thenReturn(3);
+            processor.handleSync(player, packet(new PlaceAction(9, source, destination)), 0);
+        }
+
+        assertEquals(ItemStackResponseStatus.OK, response(player).result());
+        assertEquals(9, inventory.getItemStack(3).getCount());
+        verify(spectator).viewContainerSlot(chest, 0);
+        verify(player, never()).viewContainerSlot(chest, 0);
+    }
 }
