@@ -12,7 +12,6 @@ import org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action
 import org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.SwapAction;
 import org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.TransferItemStackRequestAction;
 
-import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -29,7 +28,7 @@ final class InventoryTransferTransaction {
     private final AllayPlayer player;
     private final Map<Container, Map<Integer, ItemStack>> snapshots = new IdentityHashMap<>();
 
-    private InventoryTransferTransaction(AllayPlayer player) {
+    InventoryTransferTransaction(AllayPlayer player) {
         this.player = player;
     }
 
