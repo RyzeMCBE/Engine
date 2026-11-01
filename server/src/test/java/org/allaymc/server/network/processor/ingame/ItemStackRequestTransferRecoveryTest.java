@@ -181,4 +181,34 @@ class ItemStackRequestTransferRecoveryTest {
         verify(spectator).viewContainerSlot(chest, 0);
         verify(player, never()).viewContainerSlot(chest, 0);
     }
+
+    @Test
+    void pluginPolicyRejectionResendsUnchangedChestContents() {
+        var player = playerWithResponses();
+        var chest = new BaseContainer(ContainerTypes.CHEST);
+        var inventory = new BaseContainer(ContainerTypes.INVENTORY);
+        var item = DIAMOND.createItemStack(6);
+        chest.setItemStack(0, item, false);
+        when(player.getOpenedContainers()).thenReturn(Set.of(chest, inventory));
+
+        var source = new ItemStackRequestSlotData(ContainerSlotType.LEVEL_ENTITY, 0, item.getUniqueId(), CHEST_NAME);
+        var destination = new ItemStackRequestSlotData(ContainerSlotType.INVENTORY, 3, 0, INV_NAME);
+        var processor = new ItemStackRequestPacketProcessor() {
+            @Override boolean allowRequest(Player ignored, ItemStackRequestAction[] actions) { return false; }
+        };
+
+        try (var slots = mockStatic(ContainerActionProcessor.class)) {
+            slots.when(() -> ContainerActionProcessor.getContainerFrom(player, CHEST_NAME)).thenReturn(chest);
+            slots.when(() -> ContainerActionProcessor.getContainerFrom(player, INV_NAME)).thenReturn(inventory);
+            slots.when(() -> ContainerActionProcessor.fromNetworkSlotIndex(chest, 0)).thenReturn(0);
+            slots.when(() -> ContainerActionProcessor.fromNetworkSlotIndex(inventory, 3)).thenReturn(3);
+            processor.handleSync(player, packet(new PlaceAction(6, source, destination)), 0);
+        }
+
+        assertEquals(ItemStackResponseStatus.ERROR, response(player).result());
+        assertEquals(6, chest.getItemStack(0).getCount());
+        assertEquals(ItemAirStack.AIR_STACK, inventory.getItemStack(3));
+        verify(player).viewContainerContents(chest);
+        verify(player).viewContainerContents(inventory);
+    }
 }
