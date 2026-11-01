@@ -1,4 +1,6 @@
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
+import org.gradle.api.publish.PublishingExtension
+import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.external.javadoc.StandardJavadocDocletOptions
 
@@ -63,6 +65,35 @@ subprojects {
         from(sourceLicense) {
             into("META-INF")
             rename { "LICENSE" }
+        }
+    }
+    // Original upstream Linux x86_64 WebRTC JNI binary, independently built
+    // from the exact pinned native source. Java-only smoke tests do not need it.
+    // A public release MUST include the signed JNI classifier alongside the
+    // normal Java / sources / Javadoc artifacts; never substitute an empty JAR.
+    if (project.name == "ryze-libdatachannel-java" &&
+        providers.gradleProperty("vendorCentralRelease").map(String::toBoolean).getOrElse(false)) {
+        val originalNativeJar = providers.provider {
+            val binaries = sources.resolve("libdatachannel/build/libs")
+                .listFiles()
+                ?.filter { it.isFile && it.name.endsWith("-linux-glibc-x86_64.jar") }
+                .orEmpty()
+            check(binaries.size == 1) {
+                "Original native classifier missing or ambiguous; first run pinned libdatachannel original-source JNI build"
+            }
+            binaries.single()
+        }
+        val nativeDistribution = tasks.register<Jar>("linuxGlibcX8664NativeJar") {
+            archiveClassifier.set("linux-glibc-x86_64")
+            from(originalNativeJar.map { zipTree(it) }) {
+                include("native/libdatachannel-java.so")
+            }
+            doFirst { check(originalNativeJar.get().length() > 0L) }
+        }
+        extensions.configure<PublishingExtension> {
+            publications.withType<MavenPublication>().configureEach {
+                artifact(nativeDistribution)
+            }
         }
     }
     dependencies {
