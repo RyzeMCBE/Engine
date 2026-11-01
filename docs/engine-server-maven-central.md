@@ -1,87 +1,125 @@
-# Preparar `engine-server` para Maven Central
+# Publicación de Engine Server en Maven Central
 
-## Estado
+> Estado: preparación técnica en [Engine PR #53](https://github.com/RyzeMCBE/Engine/pull/53).
+> NO publicado, NO ejecutar la subida antes de cumplir todas las puertas
+> de validación. Un upload a Sonatype **no significa** que sea público.
 
-**Solo propuesta en pull request: no publicar todavía.** El namespace
-`io.github.ryzemcbe` ya está verificado por el propietario.
+La biblioteca destinada a desarrolladores es:
 
-El artefacto de desarrollo propuesto es:
-
-```text
-io.github.ryzemcbe:engine-server:0.14.3-beta.1
+```kotlin
+repositories { mavenCentral() }
+dependencies {
+    implementation("io.github.ryzemcbe:engine-server:0.14.3-beta.1")
+}
 ```
 
-Esta biblioteca contiene las clases del módulo Gradle `:server` y debe
-ser compatible con los plugins que utilizan implementación nativa.
-**No es** la distribución `shadowJar` ejecutable de Engine.
+La publicación no es el servidor `shadowJar` ejecutable. La propiedad
+`-PcentralRelease=true` afecta al POM de biblioteca y sus coordenadas;
+las compilaciones normales y el JAR completo de Engine permanecen separados.
 
-La publicación de la API existente
-`io.github.ryzemcbe:engine-api:0.30.0` se mantiene independiente.
+## Orden obligatorio: dependencias antes que Engine
 
-## Modo de validación opt-in
+1. Confirmar HTTP **200** para POM **y** JAR en
+   `https://repo.maven.apache.org/maven2/` de las cuatro bibliotecas
+   originales publicadas desde Protocol:
+   `cloudburst-math-api:2.0.0-ryze.1`,
+   `cloudburst-math-immutable:2.0.0-ryze.1`,
+   `cloudburst-raknet:1.0.0.CR3-ryze.1` y
+   `nukkit-natives-java:1.0.3-ryze.1`, todas bajo
+   `io.github.ryzemcbe`. Si el deployment todavía figura como VALIDATED,
+   el propietario debe pulsar Publish en Sonatype y comprobar su propagación.
+2. Protocol [PR #7](https://github.com/RyzeMCBE/Protocol/pull/7) ya
+   se fusionó a main. El workflow **manual**
+   [publish-protocol-central.yml](https://github.com/RyzeMCBE/Protocol/blob/main/.github/workflows/publish-protocol-central.yml)
+   genera, firma y sube `bedrock-codec:1.26.60-R1` y
+   `bedrock-connection:1.26.60-R1` en un deployment con aprobación manual.
+   Solo continuar tras verificar HTTP 200 en sus POM/JAR.
+3. Confirmar HTTP 200 de StateUpdater:
+   `common:0.1.1`, `block-updater:1.26.60-R1`,
+   `item-updater:1.26.50-R1`, y de Engine API
+   `engine-api:0.30.0`, todos en `io.github.ryzemcbe`.
+4. Publicar **primero** los cinco módulos complementarios preparados desde
+   fuentes originales, ya que los snapshots externos no están en Maven Central:
+   - `ryze-transport-common:2.0.0.CR6-ryze.1`
+   - `ryze-netty-transport-nethernet:2.0.0.CR6-ryze.1`
+   - `ryze-okaeri-configs-core:5.0.13-ryze.1`
+   - `ryze-okaeri-configs-yaml-snakeyaml:5.0.13-ryze.1`
+   - `ryze-libdatachannel-java:0.24.6.0-ryze.1`,
+     incluyendo JAR JNI `linux-glibc-x86_64`.
+   Todos bajo el namespace **propio** `io.github.ryzemcbe`.
+   Ver `vendor-central/`, `docs/central-upstream-sources.md`,
+   y el workflow `publish-central-vendor.yml`.
+5. Solo cuando los cinco POM/JAR propios ya estén publicados, probar,
+   firmar y enviar `engine-server:0.14.3-beta.1` con
+   `publish-central-server.yml`. El deployment es USER_MANAGED:
+   **Publish** se hace manualmente en Sonatype.
+6. Comprobar HTTP 200 de `engine-server-0.14.3-beta.1.pom`
+   y `engine-server-0.14.3-beta.1.jar`, y ejecutar el build
+   `-PengineMavenOnly=true` de [HCF PR #67](https://github.com/RyzeMCBE/HCF/pull/67)
+   en un consumidor limpio con solo Maven Central.
 
-La propiedad `-PcentralRelease=true` elige las coordenadas de
-`engine-server` para Maven Central y **cambia las dependencias
-declaradas del servidor** a las coordenadas propuestas para sus
-bibliotecas de primer nivel, sin alterar la compilación normal:
+Nunca considerar el CI verde con una dependencia `--pending` como prueba
+de que esa biblioteca está publicada. La puerta de publicación de Engine
+rechaza cualquier POM que no se resuelva públicamente.
 
-- `io.github.ryzemcbe:engine-api:0.30.0`
-- `io.github.ryzemcbe:bedrock-connection:1.26.60-R1`
-- `io.github.ryzemcbe:common:0.1.1`
-- `io.github.ryzemcbe:block-updater:1.26.60-R1`
-- `io.github.ryzemcbe:item-updater:1.26.50-R1`
+## Firma GPG original (sin regenerar ni compartir claves)
 
-Las publicaciones anteriores de Protocol y StateUpdater deben estar
-**PUBLISHED** y ser resolubles desde Maven Central antes de crear una
-versión definitiva de Engine Server.
+Identidad: `RyzeMCBE Development Studio`
 
-El modo de desarrollo habitual no cambia `server.version` ni usa estas
-coordenadas nuevas.
+Key ID: `32F428403DE9E4D8`
 
-## Revisar POM sin subir nada
+Fingerprint esperado: `0DE435F45DAAE3CCB759E01B32F428403DE9E4D8`
+
+GitHub: configurar el entorno **maven-central** en
+`RyzeMCBE/Engine`, con los secretos:
+`GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`,
+`MAVEN_CENTRAL_USERNAME`, `MAVEN_CENTRAL_PASSWORD`.
+Reutilizar los valores originales ya disponibles en el VPS; nunca
+enviarlos por chats, documentación o comentarios de PR.
+No generar una firma alternativa.
+
+Después de fusionar el PR validado en `main`, abrir
+[Actions](https://github.com/RyzeMCBE/Engine/actions) y ejecutar
+primero `Maven Central - Engine original-source dependencies`
+con `operation=verify-signature`; también usar
+`Maven Central - Engine Server` con esa misma operación.
+Ambas pruebas verifican huella y firma sin subir archivos.
+La subida requiere escoger `upload` y escribir la confirmación exacta
+mostrada en la pantalla del workflow.
+
+No enviar artefactos si falla cualquier verificación. Revisar el
+deployment USER_MANAGED en
+https://central.sonatype.com/publishing/deployments antes de pulsar Publish.
+
+## Puertas técnicas locales y GitHub Actions
 
 ```bash
+# Modo opt-in de publicación; jamás modifica el ejecutable normal.
 ./gradlew :server:generatePomFileForMavenPublication \
   -PcentralRelease=true --no-daemon
 python3 .github/scripts/verify-central-server-pom.py
+python3 .github/scripts/audit-central-resolution.py \
+  server/build/publications/maven/pom-default.xml
 ```
 
-Esto comprueba el namespace, la versión y las dependencias entre los
-módulos de la organización. **No** prueba que todas las bibliotecas
-transitivas de terceros estén disponibles en Maven Central.
+`central-upstream-source-build.yml` compila fuentes originales
+con SHA fijo; `central-vendor-candidates.yml` genera los cinco
+módulos Java (sin publicar); `central-rtc-native.yml` comprueba el
+JAR JNI original Linux x86_64 y el empaquetado equivalente con licencia.
 
-## Bloqueos de publicación
+El workflow final de Engine comprueba POM, transitividad mediante Maven
+aislado y mirror exclusivo de Central, JAR, sources, Javadoc y firmas
+GPG. Una prueba de integración de HCF y de arranque de NetherNet en
+servidor real sigue siendo necesaria para certificar ejecución de plugins.
 
-1. Publicar y verificar Protocol y StateUpdater con sus dependencias
-   externas accesibles desde Maven Central.
-2. Auditar el POM completo de Engine Server y asegurar que todas las
-   dependencias externas se resuelven desde `mavenCentral()`, sin
-   repositorios de terceros, JitPack ni snapshots inaccesibles.
-3. Verificar JAR normal, sources, Javadoc, firmas y licencias.
-4. Probar HCF con `engine-server` publicado, sin descargar
-   ningún JAR de servidor manualmente.
-5. Realizar un despliegue firmado y manual en Sonatype; revisarlo en
-   https://central.sonatype.com/publishing y confirmar Publish.
+## Comprobación final pública
 
-**No ejecutar `publishToMavenCentral` antes de completar esta lista.**
-No se reemplazan ni retaggean versiones ya publicadas.
+```bash
+base="https://repo.maven.apache.org/maven2/io/github/ryzemcbe/engine-server/0.14.3-beta.1"
+curl -fsS -o /dev/null -w 'POM HTTP %{http_code}\n' "$base/engine-server-0.14.3-beta.1.pom"
+curl -fsS -o /dev/null -w 'JAR HTTP %{http_code}\n' "$base/engine-server-0.14.3-beta.1.jar"
+```
 
-## Resultado del control real de Maven Central (31-10-2026)
-
-El CI ahora verifica las dependencias directas del POM mediante
-`.github/scripts/audit-central-resolution.py`, sin publicar.
-
-La publicación de `engine-server` sigue bloqueada: cuatro bibliotecas
-de terceros no se resuelven con `mavenCentral()` (HTTP 404):
-
-- `org.cloudburstmc.netty:netty-transport-nethernet:2.0.0.CR6-20261026.130552-16`
-- `com.jetbrains.intellij.java:java-gui-forms-rt:261.24374.191`
-- `eu.okaeri:okaeri-configs-yaml-snakeyaml:5.0.13`
-- `dev.opencollab:libdatachannel-java:0.24.6.0-20261023.142230-9`
-
-Además faltan publicaciones de primer nivel de Protocol y StateUpdater.
-Resolver las versiones externas mediante alternativas compatibles de Central
-o módulos propios compilados de fuentes con licencias auditadas, sin eliminar
-a ciegas librerías de protocolo, RTC o persistencia. La disponibilidad de
-dependencias directas **no verifica toda la transitividad**; después habrá
-que probar un consumidor independiente solo con Maven Central.
+Ambas respuestas deben indicar HTTP 200. Una vez pública y verificada
+la dependencia, actualizar README para desarrolladores con estas
+coordenadas. No anunciarla antes.
