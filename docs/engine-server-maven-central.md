@@ -1,19 +1,25 @@
 # Publicación de Engine Server en Maven Central
 
-> Estado: [Engine PR #53](https://github.com/RyzeMCBE/Engine/pull/53) integrado.
-> NO publicado, NO ejecutar la subida antes de cumplir todas las puertas
-> de validación. Un upload a Sonatype **no significa** que sea público.
+> Estado: **publicado en Maven Central y verificado con un consumidor independiente**.
+> Implementación en [Engine PR #53](https://github.com/RyzeMCBE/Engine/pull/53)
+> y validación final en [Engine PR #55](https://github.com/RyzeMCBE/Engine/pull/55).
 
 Última comprobación pública del 1 de noviembre de 2026: Engine API 0.30.0,
 los tres módulos de StateUpdater, las cuatro bibliotecas originales de
 Protocol, sus dos módulos Bedrock y los cinco complementos de Engine
 ya tienen POM/JAR públicos (HTTP 200). También está público el clasificador
-JNI Linux glibc x86_64. Engine Server sigue pendiente de publicación.
+JNI Linux glibc x86_64. Engine Server `0.14.3-beta.1` también tiene POM,
+JAR y firma públicos (HTTP 200).
 
-El primer `verify-release` compiló Java, pero el proceso de pruebas
-terminó al arrancar el servidor completo sin el JNI excluido del SDK.
-Ese clasificador se añade al runtime de **pruebas**, sin incluirlo en
-las dependencias publicadas del SDK. El workflow
+La [subida firmada](https://github.com/RyzeMCBE/Engine/actions/runs/41324277229)
+terminó correctamente con la clave GPG original. El
+[consumidor independiente](https://github.com/RyzeMCBE/Engine/actions/runs/41325915698)
+compiló clases del servidor, Engine API y Bedrock usando únicamente
+Maven Central y un entorno Gradle nuevo.
+
+Las pruebas arrancan un servidor completo con el clasificador JNI en
+su runtime de **pruebas**, sin incluirlo en las dependencias publicadas
+del SDK. El workflow
 `verify-central-server-release.yml` comprueba ahora la variante real de
 release en los PR, usando las mismas comprobaciones que el envío manual.
 Los dos workflows conservan informes y logs de arranque aunque falle el build.
@@ -34,7 +40,10 @@ La publicación no es el servidor `shadowJar` ejecutable. La propiedad
 `-PcentralRelease=true` afecta al POM de biblioteca y sus coordenadas;
 las compilaciones normales y el JAR completo de Engine permanecen separados.
 
-## Orden obligatorio: dependencias antes que Engine
+## Orden de publicación: dependencias antes que Engine
+
+La secuencia de publicación de `0.14.3-beta.1` ya se completó. Las versiones
+publicadas son inmutables; los pasos siguientes documentan ese proceso.
 
 1. Confirmar HTTP **200** para POM **y** JAR en
    `https://repo.maven.apache.org/maven2/` de las cuatro bibliotecas
@@ -191,6 +200,6 @@ curl -fsS -o /dev/null -w 'POM HTTP %{http_code}\n' "$base/engine-server-0.14.3-
 curl -fsS -o /dev/null -w 'JAR HTTP %{http_code}\n' "$base/engine-server-0.14.3-beta.1.jar"
 ```
 
-Ambas respuestas deben indicar HTTP 200. Una vez pública y verificada
-la dependencia, actualizar README para desarrolladores con estas
-coordenadas. No anunciarla antes.
+Ambas respuestas deben indicar HTTP 200. Esta comprobación y el consumidor
+independiente finalizaron correctamente el 1 de noviembre de 2026.
+El README contiene las coordenadas y ejemplos de Gradle/Maven para desarrolladores.

@@ -73,9 +73,10 @@ bajo nuestra firma sin comprobar expresamente términos y fuentes.
 6. El propietario publicará y aprobará el deployment en Sonatype.
 
 Estado actual: Protocol PR #7 y Engine PR #53 se fusionaron a main.
-Los módulos Bedrock y los cinco complementos originales de Engine ya
-responden HTTP 200. Falta verificar y publicar Engine Server y después
-ejecutar las pruebas de consumidor.
+Los módulos Bedrock, los cinco complementos originales y Engine Server
+`0.14.3-beta.1` ya responden HTTP 200. El
+[consumidor independiente](https://github.com/RyzeMCBE/Engine/actions/runs/41325915698)
+compiló correctamente utilizando únicamente Maven Central.
 
 ## Ajustes de compilación original
 
