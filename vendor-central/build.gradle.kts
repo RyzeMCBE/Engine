@@ -71,6 +71,7 @@ subprojects {
             "ryze-libdatachannel-java" -> {
                 "implementation"("org.slf4j:slf4j-api:2.0.18")
                 "compileOnly"("org.eclipse.jdt:org.eclipse.jdt.annotation:2.4.100")
+                "compileOnly"("tel.schich:jni-access-generator:1.2.3")
                 "annotationProcessor"("tel.schich:jni-access-generator:1.2.3")
             }
             "ryze-netty-transport-nethernet" -> {
