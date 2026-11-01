@@ -34,6 +34,7 @@
 | Recurso | Acceso |
 | --- | --- |
 | Engine API 0.30.0 | [Maven Central](https://central.sonatype.com/artifact/io.github.ryzemcbe/engine-api/0.30.0) |
+| Biblioteca Engine Server 0.14.3-beta.1 | [Maven Central](https://central.sonatype.com/artifact/io.github.ryzemcbe/engine-server/0.14.3-beta.1) |
 | Descargas del servidor y SDK | [GitHub Releases](https://github.com/RyzeMCBE/Engine/releases) |
 | Guía del SDK y alternativa sin Maven Central | [Developer SDK](docs/developer-distribution.md) |
 | Distribución de la beta de Linux | [Instalación del servidor](docs/engine-beta-distribution.md) |
@@ -123,6 +124,35 @@ El `api_version` del descriptor **no** es el `groupId` de Maven. Si tu proyecto 
 
 **Otras vías de distribución:** el [Developer SDK](docs/developer-distribution.md) también incluye un repositorio Maven local y explica GitHub Packages con la coordenada heredada `org.ryzemcbe.allay:api:0.30.0-SNAPSHOT`. Esa coordenada **no es** la de Maven Central y GitHub Packages puede requerir credenciales. El SDK no incluye un proyecto de plugin de ejemplo.
 
+## 🧱 Integraciones con Engine Server
+
+La biblioteca `engine-server` permite compilar referencias a las clases de implementación `org.allaymc.server.*`. Su POM incluye Engine API y las dependencias transitivas del servidor, disponibles en Maven Central. Utiliza **JDK 21** y, para plugins, `compileOnly` o `provided` porque Engine proporciona esas clases en ejecución.
+
+### Gradle — Kotlin DSL
+
+```kotlin
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly("io.github.ryzemcbe:engine-server:0.14.3-beta.1")
+}
+```
+
+### Maven
+
+```xml
+<dependency>
+    <groupId>io.github.ryzemcbe</groupId>
+    <artifactId>engine-server</artifactId>
+    <version>0.14.3-beta.1</version>
+    <scope>provided</scope>
+</dependency>
+```
+
+La publicación incluye la biblioteca, fuentes, Javadoc y firmas GPG. El [consumidor independiente](https://github.com/RyzeMCBE/Engine/actions/runs/41325915698) compiló clases del servidor, de la API y del protocolo Bedrock utilizando únicamente `mavenCentral()`, desde un entorno Gradle limpio. Consulta la [guía de publicación y verificación](docs/engine-server-maven-central.md).
+
 ## 🚀 Descargar y ejecutar Engine
 
 La distribución de referencia es **Engine 0.14.3 Beta 1**, para **Linux glibc x86_64** con **Java 21**. La beta incorpora soporte registrado para Minecraft Bedrock 1.26.60, además de versiones anteriores de protocolo incluidas en el fork.
@@ -192,6 +222,7 @@ Las versiones de **Engine Server** y **Engine API** son independientes:
 | Producto | Versión de referencia | Canal |
 | --- | --- | --- |
 | **Engine Server** | `0.14.3-beta.1` | [Beta en GitHub Releases](https://github.com/RyzeMCBE/Engine/releases) |
+| **Biblioteca Engine Server** | `0.14.3-beta.1` | [Artefacto Maven Central](https://central.sonatype.com/artifact/io.github.ryzemcbe/engine-server/0.14.3-beta.1) |
 | **Engine API** | `0.30.0` | [Artefacto Maven Central](https://central.sonatype.com/artifact/io.github.ryzemcbe/engine-api/0.30.0) |
 | **Developer SDK** | `0.30.0-SNAPSHOT` (coordenada heredada) | [SDK descargable / GitHub Packages](docs/developer-distribution.md) |
 
