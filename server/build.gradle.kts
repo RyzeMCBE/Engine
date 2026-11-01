@@ -51,7 +51,13 @@ dependencies {
     api(libs.netty.kqueue)
     // Preserve the Protocol submodule's older RakNet API: BedrockPeer still
     // links RakDisconnectReason, removed from Cloudburst RakNet 2.x.
-    api(libs.nethernet.transport) { exclude(group = "io.netty") }
+    if (centralRelease) {
+        api("io.github.ryzemcbe:ryze-netty-transport-nethernet:2.0.0.CR6-ryze.1") {
+            exclude(group = "io.netty")
+        }
+    } else {
+        api(libs.nethernet.transport) { exclude(group = "io.netty") }
+    }
     // Only the Linux glibc x86_64 native WebRTC transport is bundled.
     // The native runtime belongs to the executable distribution, not the developer SDK POM.
     if (!centralRelease) runtimeOnly("dev.opencollab:libdatachannel-java:${libs.versions.libdatachannel.get()}:linux-glibc-x86_64")
@@ -80,8 +86,14 @@ dependencies {
             exclude(group = "org.cloudburstmc.fastutil.maps")
         }
     }
-    api(libs.okaeri.configs.yaml.snakeyaml) {
-        exclude(group = "org.yaml", module = "snakeyaml") // Use the latest version
+    if (centralRelease) {
+        api("io.github.ryzemcbe:ryze-okaeri-configs-yaml-snakeyaml:5.0.13-ryze.1") {
+            exclude(group = "org.yaml", module = "snakeyaml") // Preserve Engine's SnakeYAML
+        }
+    } else {
+        api(libs.okaeri.configs.yaml.snakeyaml) {
+            exclude(group = "org.yaml", module = "snakeyaml") // Use the latest version
+        }
     }
     api(libs.bstats)
     api(libs.lz4.java)
