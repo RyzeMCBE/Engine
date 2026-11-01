@@ -17,6 +17,9 @@ las dependencias publicadas del SDK. El workflow
 `verify-central-server-release.yml` comprueba ahora la variante real de
 release en los PR, usando las mismas comprobaciones que el envío manual.
 Los dos workflows conservan informes y logs de arranque aunque falle el build.
+También ejecutan expresamente `:server:plainJavadocJar` antes de inspeccionar
+el paquete: generar únicamente los metadatos de Gradle no ejecuta esa tarea
+adjunta a la publicación Maven.
 
 La biblioteca destinada a desarrolladores es:
 

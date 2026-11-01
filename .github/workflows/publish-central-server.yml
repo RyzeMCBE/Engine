@@ -116,7 +116,7 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x ./gradlew
-          ./gradlew build :server:generatePomFileForMavenPublication :server:generateMetadataFileForMavenPublication \
+          ./gradlew build :server:plainJavadocJar :server:generatePomFileForMavenPublication :server:generateMetadataFileForMavenPublication \
             -PcentralRelease=true --no-daemon --stacktrace
 
       - name: Audit Central-only resolution and plain SDK artifacts
