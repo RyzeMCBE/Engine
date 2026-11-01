@@ -102,7 +102,13 @@ jobs:
               # duplicate 'static_ltree' symbol unrelated to Nukkit JNI.
               cmake --build build-native --target nukkit-natives --parallel 2
               test -s src/main/resources/libnukkit-natives.so
-              mvn --batch-mode --no-transfer-progress -DskipTests -Dantrun.skip=true package
+              # Invoke the original compiler and JAR goals directly: the legacy
+              # Linux Maven lifecycle still launches make in a directory with
+              # no Makefile even with -Dantrun.skip=true. JNI already compiled.
+              mvn --batch-mode --no-transfer-progress -DskipTests \
+                org.apache.maven.plugins:maven-compiler-plugin:3.8.0:compile \
+                org.apache.maven.plugins:maven-jar-plugin:3.2.0:jar
+              ldd -r src/main/resources/libnukkit-natives.so
               ;;
             raknet)
               # The historical foojay 0.4 plugin does not work with
