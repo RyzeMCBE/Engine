@@ -78,6 +78,19 @@ jobs:
             grep -q '<licenses>' "vendor-central/$module/build/publications/maven/pom-default.xml"
           done
           echo 'PASS: Java source candidates and local publication metadata. No Sonatype upload.'
+      - name: Audit ALL five candidate POMs against public Maven Central
+        shell: bash
+        run: |
+          set -euo pipefail
+          # These three sibling POMs are built together in the same future
+          # Sonatype bundle. Every other external dependency must be PUBLIC.
+          python3 .github/scripts/audit-central-resolution.py \
+            --pending io.github.ryzemcbe:ryze-transport-common:2.0.0.CR6-ryze.1 \
+            --pending io.github.ryzemcbe:ryze-libdatachannel-java:0.24.6.0-ryze.1 \
+            --pending io.github.ryzemcbe:ryze-okaeri-configs-core:5.0.13-ryze.1 \
+            vendor-central/*/build/publications/maven/pom-default.xml
+          echo 'PASS: only the three sibling POM references are allowed to be pending prior to publishing.'
+
       - name: Preserve original-source binaries for inspection
         uses: actions/upload-artifact@v7
         with:
