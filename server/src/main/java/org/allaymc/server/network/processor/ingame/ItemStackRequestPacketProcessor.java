@@ -66,19 +66,6 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
                 }
             }
 
-            try {
-                if (!allowRequest(player, actions)) {
-                    encodedResponses.add(new ItemStackResponse(ItemStackResponseStatus.ERROR,
-                            request.requestId(), Collections.emptyList()));
-                    continue;
-                }
-            } catch (RuntimeException exception) {
-                log.debug("Rejecting invalid inventory request id={}", request.requestId(), exception);
-                encodedResponses.add(new ItemStackResponse(ItemStackResponseStatus.ERROR,
-                        request.requestId(), Collections.emptyList()));
-                continue;
-            }
-
             // Only pure PLACE/TAKE/SWAP requests are safe to reverse. Crafting,
             // item drops and world actions may have irreversible side effects.
             InventoryTransferTransaction transfer = null;
@@ -91,6 +78,21 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
                             request.requestId(), Collections.emptyList()));
                     continue;
                 }
+            }
+
+            try {
+                if (!allowRequest(player, actions)) {
+                    if (transfer != null) rejectedTransfers.add(transfer);
+                    encodedResponses.add(new ItemStackResponse(ItemStackResponseStatus.ERROR,
+                            request.requestId(), Collections.emptyList()));
+                    continue;
+                }
+            } catch (RuntimeException exception) {
+                if (transfer != null) rejectedTransfers.add(transfer);
+                log.debug("Rejecting invalid inventory request id={}", request.requestId(), exception);
+                encodedResponses.add(new ItemStackResponse(ItemStackResponseStatus.ERROR,
+                        request.requestId(), Collections.emptyList()));
+                continue;
             }
 
             Map<String, Object> dataPool = new HashMap<>();
