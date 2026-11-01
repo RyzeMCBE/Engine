@@ -1,6 +1,6 @@
 # Preparar bibliotecas de terceros desde sus repositorios originales
 
-Estado: **los cinco candidatos Java compilaron y generaron POM/JAR/sources/Javadoc en CI, pero NO están publicados**. La prueba original de JNI Linux glibc x86_64 ha finalizado en verde. Las pruebas de firma y publicación firmada en Maven Central requieren el entorno y la aprobación manual del propietario. La publicación bajo `io.github.ryzemcbe` debe conservar
+Estado al 1 de noviembre de 2026: **los cinco módulos están publicados en Maven Central**, con POM/JAR públicos y el clasificador JNI Linux glibc x86_64 disponible. El [envío firmado](https://github.com/RyzeMCBE/Engine/actions/runs/41320672870) terminó correctamente y el propietario aprobó su publicación en Sonatype. La publicación bajo `io.github.ryzemcbe` debe conservar
 paquetes Java binariamente compatibles, fuentes, licencia, autores y cualquier
 NOTICE original. No usar coordenadas originales de otro propietario.
 
@@ -33,7 +33,7 @@ propios:
 - `ryze-libdatachannel-java:0.24.6.0-ryze.1` con classifier JNI
   `linux-glibc-x86_64`
 
-Estas coordenadas son **candidatas compiladas, NO publicadas en Central**. Publicar un proyecto con un groupId diferente sin actualizar sus
+Estas coordenadas ya están publicadas bajo el namespace propio. Publicar un proyecto con un groupId diferente sin actualizar sus
 POMs y las referencias de Protocol/Engine no resuelve nada. Algunos proyectos
 dependen de otros módulos del mismo proyecto; publicarlos también o enlazarlos
 correctamente es obligatorio.
@@ -72,10 +72,10 @@ bajo nuestra firma sin comprobar expresamente términos y fuentes.
    scoreboard y HCF.
 6. El propietario publicará y aprobará el deployment en Sonatype.
 
-Estado actual: Protocol PR #7 se fusionó a main. Engine PR #53 sigue abierto;
-la publicación de ambos módulos Bedrock, de los cinco candidatos originales
-de Engine y de engine-server sigue bloqueada hasta publicación manual,
-HTTP 200 y pruebas de consumidor.
+Estado actual: Protocol PR #7 y Engine PR #53 se fusionaron a main.
+Los módulos Bedrock y los cinco complementos originales de Engine ya
+responden HTTP 200. Falta verificar y publicar Engine Server y después
+ejecutar las pruebas de consumidor.
 
 ## Ajustes de compilación original
 

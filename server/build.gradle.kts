@@ -110,6 +110,11 @@ dependencies {
 
     testImplementation(libs.bundles.junit)
     testRuntimeOnly(libs.junit.platform.launcher)
+    if (centralRelease) {
+        // Integration tests start NetherNet; the headless developer SDK does not
+        // publish a platform-specific native runtime dependency.
+        testRuntimeOnly("io.github.ryzemcbe:ryze-libdatachannel-java:0.24.6.0-ryze.1:linux-glibc-x86_64")
+    }
 }
 
 gitProperties {

@@ -117,27 +117,25 @@ jobs:
           set -euo pipefail
           chmod +x ./gradlew
           ./gradlew build :server:generatePomFileForMavenPublication :server:generateMetadataFileForMavenPublication \
-            -PcentralRelease=true --no-daemon
+            -PcentralRelease=true --no-daemon --stacktrace
 
-      - name: Audit POM and ALL transitive dependencies with only Maven Central
+      - name: Audit Central-only resolution and plain SDK artifacts
         if: inputs.operation != 'verify-signature'
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 .github/scripts/verify-central-server-pom.py
-          python3 .github/scripts/audit-central-resolution.py \
-            server/build/publications/maven/pom-default.xml
-          tmp_repo="$(mktemp -d)"
-          trap 'rm -rf "$tmp_repo"' EXIT
-          mvn --batch-mode --no-transfer-progress \
-            --settings .github/maven-central-only-settings.xml \
-            -Dmaven.repo.local="$tmp_repo" \
-            -f server/build/publications/maven/pom-default.xml \
-            org.apache.maven.plugins:maven-dependency-plugin:3.10.0:resolve
+        run: bash .github/scripts/verify-central-server-release.sh
 
-      - name: Verify SDK excludes executable variants and bundled dependencies
-        if: inputs.operation != 'verify-signature'
-        run: python3 .github/scripts/verify-central-server-artifacts.py
+      - name: Preserve test reports and server startup diagnostics
+        if: ${{ always() && inputs.operation != 'verify-signature' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: engine-central-test-reports-${{ github.sha }}
+          path: |
+            server/build/test-results/test/**
+            server/build/reports/tests/test/**
+            .test/logs/**
+            .test/hs_err_pid*.log
+          include-hidden-files: true
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Sign the validated server publication using the original key
         if: inputs.operation == 'upload'
