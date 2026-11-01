@@ -72,7 +72,8 @@ subprojects {
     // A public release MUST include the signed JNI classifier alongside the
     // normal Java / sources / Javadoc artifacts; never substitute an empty JAR.
     if (project.name == "ryze-libdatachannel-java" &&
-        providers.gradleProperty("vendorCentralRelease").map(String::toBoolean).getOrElse(false)) {
+        (providers.gradleProperty("vendorCentralRelease").map(String::toBoolean).getOrElse(false) ||
+         providers.gradleProperty("vendorNativeClassifierTest").map(String::toBoolean).getOrElse(false))) {
         val originalNativeJar = providers.provider {
             val binaries = sources.resolve("libdatachannel/build/libs")
                 .listFiles()
