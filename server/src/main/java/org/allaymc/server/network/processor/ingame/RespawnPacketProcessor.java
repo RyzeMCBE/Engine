@@ -148,6 +148,11 @@ public class RespawnPacketProcessor extends PacketProcessor<RespawnPacket> {
         }
     }
 
+    /** True when a CLIENT_READY transaction is under recovery. */
+    public static boolean isRespawnPending(Player player) {
+        return RESPAWNING.containsKey(player);
+    }
+
     private static boolean isCurrent(Player player, RespawnProgress progress) {
         return RESPAWNING.get(player) == progress;
     }
