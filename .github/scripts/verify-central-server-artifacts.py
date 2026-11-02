@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import zipfile
 
-VERSION = "0.14.3-beta.1"
+VERSION = "0.14.3-beta.2"
 FINGERPRINT = "0DE435F45DAAE3CCB759E01B32F428403DE9E4D8"
 
 

@@ -13,7 +13,7 @@ def value(node, name):
 
 assert value(root, "groupId") == "io.github.ryzemcbe", value(root, "groupId")
 assert value(root, "artifactId") == "engine-server", value(root, "artifactId")
-assert value(root, "version") == "0.14.3-beta.1", value(root, "version")
+assert value(root, "version") == "0.14.3-beta.2", value(root, "version")
 assert value(root, "name")
 assert root.find("{*}licenses/{*}license") is not None
 assert root.find("{*}developers/{*}developer") is not None

@@ -59,7 +59,7 @@ subprojects {
         if (project.name == "server") apply(plugin = "com.vanniktech.maven.publish")
 
         project.version = if (centralRelease && project.name == "server") {
-            providers.gradleProperty("engineServerReleaseVersion").orElse("0.14.3-beta.1").get()
+            providers.gradleProperty("engineServerReleaseVersion").orElse("0.14.3-beta.2").get()
         } else {
             rootProject.property(project.name + ".version").toString() +
                 if (rootProject.property("allay.is-dev-build").toString().toBoolean()) "-dev" else ""
