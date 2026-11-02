@@ -367,11 +367,13 @@ public class PlayerAuthInputPacketProcessor extends PacketProcessor<PlayerAuthIn
             switch (input) {
                 case START_SPRINTING -> {
                     if (entity.getFoodLevel() <= 6) {
-                        log.warn("Player {} tried to start sprinting without enough food level", player.getOriginName());
-                        return;
+                        // Low food is a normal gameplay rejection, not a server warning.
+                        // Do not return from handleInputData: the same packet may contain
+                        // STOP_SNEAKING, STOP_GLIDING or other input transitions.
+                        log.debug("Ignoring sprint start for {}: food level is too low", player.getOriginName());
+                    } else {
+                        entity.setSprinting(true);
                     }
-
-                    entity.setSprinting(true);
                 }
                 case STOP_SPRINTING -> entity.setSprinting(false);
                 case START_SNEAKING -> entity.setSneaking(true);
