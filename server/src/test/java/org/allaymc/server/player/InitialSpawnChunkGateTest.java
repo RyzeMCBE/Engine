@@ -29,15 +29,19 @@ class InitialSpawnChunkGateTest {
     }
 
     @Test
-    void theSameGateWorksForOtherSupportedProtocolFamilies() {
-        // The initial spawn path is shared by all registered protocols, not version-specific.
-        for (int protocol : new int[]{818, 1001, 2168, 2169, 2193, 2225}) {
-            var gate = new InitialSpawnChunkGate(30, 2);
-            for (int i = 0; i < 12; i++) {
-                assertFalse(gate.chunkQueued(), "protocol " + protocol);
+    void requiredChunkCountMatchesCircularLoaderForDifferentRadiiAndServerSettings() {
+        // All protocol implementations share ChunkLoaderHolder's circular radius rule.
+        for (int radius = 0; radius <= 24; radius++) {
+            int available = 0;
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (dx * dx + dz * dz <= radius * radius) available++;
+                }
             }
-            assertTrue(gate.chunkQueued(), "protocol " + protocol);
-            assertFalse(gate.chunkQueued(), "protocol " + protocol + " must not spawn twice");
+            for (int target : new int[]{1, 2, 5, 13, 29, 30, 40, 100, 500}) {
+                assertEquals(Math.min(target, available), InitialSpawnChunkGate.requiredForRadius(target, radius),
+                        "radius=" + radius + ", target=" + target);
+            }
         }
     }
 
