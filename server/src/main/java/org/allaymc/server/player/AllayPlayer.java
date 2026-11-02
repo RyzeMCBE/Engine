@@ -129,7 +129,7 @@ public class AllayPlayer implements Player {
     private final DimensionArrivalTracker dimensionArrivalTracker = new DimensionArrivalTracker();
     @Getter
     protected volatile ProtocolSession protocolSession;
-    protected final AtomicInteger fullyJoinChunkThreshold;
+    protected final InitialSpawnChunkGate initialSpawnChunks;
     @Getter
     protected final BedrockServerSession session;
     @Getter
@@ -207,7 +207,9 @@ public class AllayPlayer implements Player {
         this.sourceInterface = sourceInterface;
         this.session.setPacketHandler(new AllayPacketHandler());
         this.bootstrapProcessorHolder = createBootstrapProcessorHolder();
-        this.fullyJoinChunkThreshold = new AtomicInteger(AllayServer.getSettings().worldSettings().fullyJoinChunkThreshold());
+        var worldSettings = AllayServer.getSettings().worldSettings();
+        this.initialSpawnChunks = new InitialSpawnChunkGate(
+                worldSettings.fullyJoinChunkThreshold(), worldSettings.viewDistance());
         this.speed = DEFAULT_SPEED;
         this.flySpeed = DEFAULT_FLY_SPEED;
         this.verticalFlySpeed = DEFAULT_VERTICAL_FLY_SPEED;
@@ -306,6 +308,22 @@ public class AllayPlayer implements Player {
                 actor.getContainer(ContainerTypes.CURSOR)}) {
             if (container != null) viewContainerContents(container);
         }
+    }
+
+    /**
+     * A negotiated chunk radius can be smaller than the configured initial-spawn chunk count.
+     * Recheck immediately: no further chunks may arrive after the radius shrinks.
+     */
+    public void onInitialChunkRadiusChanged(int radius) {
+        boolean ready = initialSpawnChunks.radiusUpdated(radius);
+        if (ready && getClientState() == ClientState.SPAWNED) {
+            onFullyJoin();
+        }
+    }
+
+    /** Metadata-only progress for login timeout diagnostics. */
+    public String describeInitialSpawnProgress() {
+        return initialSpawnChunks.queuedCount() + "/" + initialSpawnChunks.requiredCount();
     }
 
     protected void onFullyJoin() {
@@ -489,7 +507,7 @@ public class AllayPlayer implements Player {
         // Async chunks are sent after the target entity is registered.
         this.controlledEntity.getDimension().getEntityManager().forEachEntitiesInChunk(
                 chunk.getX(), chunk.getZ(), entity -> entity.spawnTo(this));
-        if (fullyJoinChunkThreshold.get() > 0 && fullyJoinChunkThreshold.decrementAndGet() == 0) {
+        if (getClientState() == ClientState.SPAWNED && initialSpawnChunks.chunkQueued()) {
             onFullyJoin();
         }
         return true;
