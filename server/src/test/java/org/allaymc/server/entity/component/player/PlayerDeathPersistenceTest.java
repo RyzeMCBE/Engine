@@ -19,10 +19,10 @@ class PlayerDeathPersistenceTest {
         var armor = mock(Container.class);
         var offhand = mock(Container.class);
 
-        when(enderChest.getContainerType()).thenReturn(ContainerTypes.ENDER_CHEST);
-        when(inventory.getContainerType()).thenReturn(ContainerTypes.INVENTORY);
-        when(armor.getContainerType()).thenReturn(ContainerTypes.ARMOR);
-        when(offhand.getContainerType()).thenReturn(ContainerTypes.OFFHAND);
+        doReturn(ContainerTypes.ENDER_CHEST).when(enderChest).getContainerType();
+        doReturn(ContainerTypes.INVENTORY).when(inventory).getContainerType();
+        doReturn(ContainerTypes.ARMOR).when(armor).getContainerType();
+        doReturn(ContainerTypes.OFFHAND).when(offhand).getContainerType();
 
         assertFalse(holder.shouldDropContents(enderChest));
         assertTrue(holder.shouldDropContents(inventory));
