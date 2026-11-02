@@ -37,6 +37,8 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
                 player.getOriginName(), receiveTime, packet.getRequests().size());
 
         List<ItemStackResponse> encodedResponses = new LinkedList<>();
+        List<InventoryTransferTransaction> committedTransfers = new ArrayList<>();
+        List<InventoryTransferTransaction> rejectedTransfers = new ArrayList<>();
 
         label:
         for (var request : packet.getRequests()) {
@@ -64,13 +66,29 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
                 }
             }
 
+            // Only pure PLACE/TAKE/SWAP requests are safe to reverse. Crafting,
+            // item drops and world actions may have irreversible side effects.
+            InventoryTransferTransaction transfer = null;
+            if (InventoryTransferTransaction.supports(actions)) {
+                try {
+                    transfer = InventoryTransferTransaction.capture((AllayPlayer) player, actions);
+                } catch (RuntimeException exception) {
+                    log.warn("Rejecting item stack request {} with invalid slots", request.requestId(), exception);
+                    encodedResponses.add(new ItemStackResponse(ItemStackResponseStatus.ERROR,
+                            request.requestId(), Collections.emptyList()));
+                    continue;
+                }
+            }
+
             try {
                 if (!allowRequest(player, actions)) {
+                    if (transfer != null) rejectedTransfers.add(transfer);
                     encodedResponses.add(new ItemStackResponse(ItemStackResponseStatus.ERROR,
                             request.requestId(), Collections.emptyList()));
                     continue;
                 }
             } catch (RuntimeException exception) {
+                if (transfer != null) rejectedTransfers.add(transfer);
                 log.debug("Rejecting invalid inventory request id={}", request.requestId(), exception);
                 encodedResponses.add(new ItemStackResponse(ItemStackResponseStatus.ERROR,
                         request.requestId(), Collections.emptyList()));
@@ -97,6 +115,10 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
                 } catch (RuntimeException exception) {
                     log.error("Rejecting failed item stack action[{}] type={} request id={}: data={}",
                             index, action.getType(), request.requestId(), action, exception);
+                    if (transfer != null) {
+                        transfer.rollback();
+                        rejectedTransfers.add(transfer);
+                    }
                     encodedResponses.add(new ItemStackResponse(
                             ItemStackResponseStatus.ITEM_REQUEST_ACTION_HANDLER_COMMIT_FAILED,
                             request.requestId(),
@@ -118,6 +140,10 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
                     ItemStackResponse errorResponse =
                             new ItemStackResponse(ItemStackResponseStatus.ERROR, request.requestId(), Collections.emptyList());
                     encodedResponses.add(errorResponse);
+                    if (transfer != null) {
+                        if (index > 0) transfer.rollback();
+                        rejectedTransfers.add(transfer);
+                    }
                     log.warn("Item stack request id={} rejected by action[{}] type={} (player={})",
                             request.requestId(), index, action.getType(), player.getOriginName());
                     continue label;
@@ -134,6 +160,7 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
             log.debug("[DEBUG-STACK-REQUEST] request id={} -> result={} containers={}",
                     request.requestId(), encoded.result(), encoded.containers().size());
             encodedResponses.add(encoded);
+            if (transfer != null) committedTransfers.add(transfer);
         }
 
         var allayPlayer = (AllayPlayer) player;
@@ -142,6 +169,23 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
         log.debug("[DEBUG-STACK-REQUEST] sending ItemStackResponsePacket entries={}", responsePacket.getEntries().size());
 
         allayPlayer.sendPacket(responsePacket);
+
+        // Never publish observer updates before the authoritative response.
+        // Rejected requests must reconcile the client's predicted inventory.
+        for (var transfer : rejectedTransfers) {
+            try {
+                transfer.resyncActor();
+            } catch (RuntimeException exception) {
+                log.warn("Failed to reconcile a rejected inventory request for {}", player.getOriginName(), exception);
+            }
+        }
+        for (var transfer : committedTransfers) {
+            try {
+                transfer.notifyObservers();
+            } catch (RuntimeException exception) {
+                log.warn("Failed to synchronize other inventory viewers for {}", player.getOriginName(), exception);
+            }
+        }
     }
 
     boolean allowRequest(Player player, ItemStackRequestAction[] actions) {
