@@ -306,6 +306,9 @@ public class AllayPlayer implements Player {
         viewContainerContents(this.controlledEntity.getContainer(ContainerTypes.INVENTORY));
         viewContainerContents(this.controlledEntity.getContainer(ContainerTypes.OFFHAND));
         viewContainerContents(this.controlledEntity.getContainer(ContainerTypes.ARMOR));
+        // The cursor is a separate authoritative container. A reconnect must reset
+        // the client's predicted cursor stack/network ID before inventory requests.
+        viewContainerContents(this.controlledEntity.getContainer(ContainerTypes.CURSOR));
         viewPlayerAbilities(this);
         viewPlayerListChange(playerManager.getPlayers().values(), true);
         playerManager.getPlayers().values().stream()
