@@ -16,9 +16,9 @@ public class RequestChunkRadiusPacketProcessor extends PacketProcessor<RequestCh
         player.getControlledEntity().setChunkLoadingRadius(
                 Math.min(Math.min(packet.getRadius(), packet.getMaxRadius()), AllayServer.getSettings().worldSettings().viewDistance()));
         var allayPlayer = (AllayPlayer) player;
-        allayPlayer.sendPacket(allayPlayer.getProtocol().getEncoder().encodeChunkRadiusUpdated(
-                player.getControlledEntity().getChunkLoadingRadius()
-        ));
+        int radius = player.getControlledEntity().getChunkLoadingRadius();
+        allayPlayer.sendPacket(allayPlayer.getProtocol().getEncoder().encodeChunkRadiusUpdated(radius));
+        allayPlayer.onInitialChunkRadiusChanged(radius);
     }
 
     @Override
