@@ -16,10 +16,8 @@ git -C "$root" fetch --no-tags --depth=1 origin main:refs/remotes/origin/main
 # This smoke test now runs on PRs based on the integrated main branch.
 # Compare against main: the old feat/minecraft-1.26.60 branch was merged and
 # is no longer guaranteed to exist on GitHub.
-# Binary compatibility requires preserving every existing API source.
-# Additive API classes (such as new optional events) must remain permitted.
-if git -C "$root" diff --name-status origin/main HEAD -- api/src/main/java | grep -Eqv '^A[[:space:]]'; then
-    echo "::error::Publishing changes must preserve the existing Allay Java API sources (additions are allowed)" >&2
+if ! git -C "$root" diff --quiet origin/main HEAD -- api/src/main/java; then
+    echo "::error::Publishing changes must preserve the existing Allay Java API sources" >&2
     exit 1
 fi
 

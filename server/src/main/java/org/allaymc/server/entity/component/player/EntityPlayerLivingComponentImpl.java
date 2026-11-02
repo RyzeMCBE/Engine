@@ -348,7 +348,7 @@ public class EntityPlayerLivingComponentImpl extends EntityLivingComponentImpl {
                 DamageType.API.getDeathInfo(thisPlayer, null);
         // A plugin may customize chat and death-screen text independently.
         // Defaults are intentionally preserved for all existing plugins.
-        var messageEvent = new org.allaymc.api.eventbus.event.entity.PlayerDeathMessageEvent(
+        var messageEvent = new org.allaymc.server.event.PlayerDeathMessageEvent(
                 thisPlayer, lastDamage, deathInfo);
         messageEvent.call();
 

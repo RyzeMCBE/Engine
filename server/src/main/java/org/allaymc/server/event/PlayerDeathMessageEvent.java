@@ -1,4 +1,6 @@
-package org.allaymc.api.eventbus.event.entity;
+package org.allaymc.server.event;
+
+import org.allaymc.api.eventbus.event.entity.EntityEvent;
 
 import org.allaymc.api.annotation.CallerThread;
 import org.allaymc.api.annotation.ThreadType;
