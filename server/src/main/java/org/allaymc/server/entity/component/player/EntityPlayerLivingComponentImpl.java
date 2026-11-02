@@ -328,6 +328,13 @@ public class EntityPlayerLivingComponentImpl extends EntityLivingComponentImpl {
     }
 
     @Override
+    protected boolean hasDeadTimer() {
+        // Bedrock can send CLIENT_READY for an immediate respawn before the
+        // default 20-tick death timer expires. Do not keep that timer enabled.
+        return !thisPlayer.getWorld().getWorldData().<Boolean>getGameRuleValue(GameRule.DO_IMMEDIATE_RESPAWN);
+    }
+
+    @Override
     protected void onDie() {
         super.onDie();
 

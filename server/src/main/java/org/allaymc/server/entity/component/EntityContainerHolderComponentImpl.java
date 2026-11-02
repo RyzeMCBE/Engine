@@ -30,7 +30,7 @@ public class EntityContainerHolderComponentImpl extends BaseContainerHolder impl
     protected void onGetDrop(CEntityGetDropEvent event) {
         for (var container : getContainers().values()) {
             container.removeAllViewers();
-            if (!canDropItemInContainers()) {
+            if (!canDropItemInContainers() || !shouldDropContents(container)) {
                 continue;
             }
 
@@ -41,6 +41,14 @@ public class EntityContainerHolderComponentImpl extends BaseContainerHolder impl
             }
             container.clearAllSlots();
         }
+    }
+
+    /**
+     * Whether the contents of a container are lost on death. Containers owned by a
+     * player may be persistent even when the regular inventory is dropped.
+     */
+    protected boolean shouldDropContents(Container container) {
+        return true;
     }
 
     protected boolean canDropItemInContainers() {
