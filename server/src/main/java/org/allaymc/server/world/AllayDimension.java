@@ -140,6 +140,9 @@ public class AllayDimension implements Dimension {
 
     public void addPlayer(Player player, Runnable runnable) {
         var entity = Preconditions.checkNotNull(player.getControlledEntity());
+        Preconditions.checkState(entity.canBeSpawned(),
+                "Cannot register player %s in dimension %s: entity state=%s",
+                player.getOriginName(), dimensionType.getIdentifier(), entity.getState());
         this.players.add(player);
         this.chunkManager.addChunkLoader(entity);
         this.entityManager.addEntity(entity, runnable);
@@ -163,6 +166,9 @@ public class AllayDimension implements Dimension {
      */
     public void addPlayerForDimensionChange(Player player, Runnable afterPlayerRegistered) {
         var entity = Preconditions.checkNotNull(player.getControlledEntity());
+        Preconditions.checkState(entity.canBeSpawned(),
+                "Cannot register player %s in dimension %s: entity state=%s",
+                player.getOriginName(), dimensionType.getIdentifier(), entity.getState());
         this.players.add(player);
         this.entityManager.addEntity(entity, () -> {
             try {

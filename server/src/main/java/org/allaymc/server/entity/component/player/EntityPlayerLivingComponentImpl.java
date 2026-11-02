@@ -17,17 +17,21 @@ import org.allaymc.api.item.component.ItemShieldBaseComponent;
 import org.allaymc.api.item.interfaces.ItemShieldStack;
 import org.allaymc.api.item.type.ItemTypes;
 import org.allaymc.api.player.GameMode;
+import org.allaymc.api.scheduler.Task;
 import org.allaymc.api.server.Server;
 import org.allaymc.api.world.gamerule.GameRule;
 import org.allaymc.api.world.sound.SimpleSound;
 import org.allaymc.server.component.annotation.ComponentObject;
 import org.allaymc.server.entity.component.EntityLivingComponentImpl;
 import org.allaymc.server.player.AllayPlayer;
+import org.allaymc.server.network.processor.ingame.RespawnPacketProcessor;
+import lombok.extern.slf4j.Slf4j;
 import org.joml.Vector3d;
 
 /**
  * @author daoge_cmd
  */
+@Slf4j
 public class EntityPlayerLivingComponentImpl extends EntityLivingComponentImpl {
     @ComponentObject
     protected EntityPlayer thisPlayer;
@@ -365,6 +369,37 @@ public class EntityPlayerLivingComponentImpl extends EntityLivingComponentImpl {
             var screen = messageEvent.getDeathScreenMessage();
             thisPlayer.getController().sendDeathInfo(screen == null
                     ? deathInfo : new org.allaymc.api.utils.tuple.Pair<>(screen, new String[0]));
+        }
+
+        // Distinguish a missing CLIENT_READY handshake from a registration callback
+        // that stalled after CLIENT_READY (which RespawnPacketProcessor already monitors).
+        if (thisPlayer.isActualPlayer()
+                && thisPlayer.getWorld().getWorldData().<Boolean>getGameRuleValue(GameRule.DO_IMMEDIATE_RESPAWN)) {
+            var deadPlayer = thisPlayer;
+            try {
+                deadPlayer.getWorld().getScheduler().scheduleRepeating(Server.getInstance(), new Task() {
+                    private int ticks;
+
+                    @Override
+                    public boolean onRun() {
+                        var controller = deadPlayer.getController();
+                        if (controller == null || !controller.isConnected()
+                                || controller.getControlledEntity() != deadPlayer
+                                || deadPlayer.getHealth() > 0) return false;
+                        if (++ticks < 60) return true;
+                        if (!RespawnPacketProcessor.isRespawnPending(controller)) {
+                            log.warn("[Respawn] Missing CLIENT_READY after death: player={}, ticks={}, "
+                                            + "entityState={}, dimension={}, health={}",
+                                    controller.getOriginName(), ticks, deadPlayer.getState(),
+                                    deadPlayer.getDimension(), deadPlayer.getHealth());
+                        }
+                        return false;
+                    }
+                }, 1);
+            } catch (RuntimeException exception) {
+                log.error("[Respawn] Could not schedule immediate-respawn handshake diagnostic for {}",
+                        deadPlayer.getUniqueId(), exception);
+            }
         }
     }
 }

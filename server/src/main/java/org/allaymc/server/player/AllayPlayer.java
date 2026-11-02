@@ -465,16 +465,20 @@ public class AllayPlayer implements Player {
 
     @Override
     public void viewChunk(Chunk chunk) {
-        // Async sender queues can outlive the old dimension. Reject stale
-        // chunks before encoding and again before enqueuing the packet.
-        if (!acceptsChunkDimension(chunk)) {
-            return;
-        }
+        tryViewChunk(chunk);
+    }
+
+    /**
+     * Queue a chunk only if the client's dimension handshake still accepts it.
+     *
+     * @return whether the chunk packet was actually queued; the chunk loader must
+     *         not record a rejected packet as sent.
+     */
+    public boolean tryViewChunk(Chunk chunk) {
+        if (!acceptsChunkDimension(chunk)) return false;
         var encoded = createLevelChunkPacket(chunk);
         synchronized (chunkPublisherLock) {
-            if (!acceptsChunkDimension(chunk)) {
-                return;
-            }
+            if (!acceptsChunkDimension(chunk)) return false;
             // Serializes chunk emission with ChangeDimensionPacket and
             // DIMENSION_CHANGE_SUCCESS to preserve wire order.
             sendNetworkChunkPublisherUpdateIfNeeded();
@@ -483,10 +487,16 @@ public class AllayPlayer implements Player {
             dimensionArrivalTracker.chunkQueued(chunk.getDimensionType().getId(), chunk.getX(), chunk.getZ());
         }
         // Async chunks are sent after the target entity is registered.
-        this.controlledEntity.getDimension().getEntityManager().forEachEntitiesInChunk(chunk.getX(), chunk.getZ(), entity -> entity.spawnTo(this));
+        this.controlledEntity.getDimension().getEntityManager().forEachEntitiesInChunk(
+                chunk.getX(), chunk.getZ(), entity -> entity.spawnTo(this));
         if (fullyJoinChunkThreshold.get() > 0 && fullyJoinChunkThreshold.decrementAndGet() == 0) {
             onFullyJoin();
         }
+        return true;
+    }
+
+    public boolean canAcceptChunk(Chunk chunk) {
+        return acceptsChunkDimension(chunk);
     }
 
     private boolean acceptsChunkDimension(Chunk chunk) {

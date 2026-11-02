@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongComparator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.allaymc.api.annotation.NotThreadSafe;
 import org.allaymc.api.entity.interfaces.EntityPlayer;
 import org.allaymc.api.math.MathUtils;
@@ -14,9 +15,12 @@ import org.allaymc.api.world.chunk.Chunk;
 import org.allaymc.api.world.chunk.ChunkLoader;
 import org.allaymc.api.world.manager.ChunkManager;
 import org.allaymc.server.AllayServer;
+import org.allaymc.server.player.AllayPlayer;
 import org.joml.Vector3i;
 
 import java.util.Collection;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.Comparator;
 import java.util.Objects;
 import java.util.Set;
@@ -33,6 +37,7 @@ import static org.allaymc.server.ServerSettings.WorldSettings.ChunkSendingStrate
  * @author daoge_cmd
  */
 @NotThreadSafe
+@Slf4j
 public final class ChunkLoaderHolder {
 
     /**
@@ -60,6 +65,12 @@ public final class ChunkLoaderHolder {
      * Stores all chunks that is in radius and have been sent.
      */
     private final LongOpenHashSet sentChunks;
+    /** Async sends are acknowledged on the owning tick thread only. */
+    private final LongOpenHashSet pendingAsyncChunks = new LongOpenHashSet();
+    private final Queue<ChunkSendResult> asyncResults = new ConcurrentLinkedQueue<>();
+    private boolean warnedAboutRejectedChunks;
+
+    private record ChunkSendResult(Chunk chunk, boolean queued) {}
     /**
      * Stores all chunks that is in radius.
      */
@@ -94,12 +105,14 @@ public final class ChunkLoaderHolder {
     }
 
     public void onRemoved() {
+        if (asyncChunkSender != null) {
+            asyncChunkSender.stop();
+        }
+        asyncResults.clear();
+        pendingAsyncChunks.clear();
         removeChunkLoaderInChunks(sentChunks);
         if (isActualPlayer()) {
             sentChunks.forEach(player::removeChunk);
-        }
-        if (asyncChunkSender != null) {
-            asyncChunkSender.stop();
         }
     }
 
@@ -112,6 +125,7 @@ public final class ChunkLoaderHolder {
             removeOutOfRadiusChunks();
             updateChunkSendingQueue();
         }
+        processAsyncResults();
         sendQueuedChunks();
     }
 
@@ -158,23 +172,17 @@ public final class ChunkLoaderHolder {
         chunkSendingQueue.clear();
         // Chunks that have already been sent will not be resent
         var difference = Sets.difference(inRadiusChunks, sentChunks);
-        difference.stream().sorted(chunkDistanceComparatorHashed).forEachOrdered(chunkHash -> {
+        difference.stream().filter(hash -> !pendingAsyncChunks.contains(hash))
+                .sorted(chunkDistanceComparatorHashed).forEachOrdered(chunkHash -> {
             chunkManager.loadChunk(chunkHash);
             chunkSendingQueue.enqueue(chunkHash);
         });
     }
 
     private void sendQueuedChunks() {
-        if (chunkSendingQueue.isEmpty()) {
-            return;
-        }
+        if (chunkSendingQueue.isEmpty()) return;
 
-        // Preserve the center-out order established by chunkSendingQueue. The async sender
-        // consumes values directly, so a hash-order map can send the spawn chunk too late.
-        // During the first part of a dimension transfer, prioritize only the 3x3
-        // arrival footprint. Other queued chunks remain untouched until it is
-        // sent, or until the short priority window expires.
-        var transferringPlayer = player instanceof org.allaymc.server.player.AllayPlayer allayPlayer
+        var transferringPlayer = player instanceof AllayPlayer allayPlayer
                 && allayPlayer.isPrioritizingDimensionArrival() ? allayPlayer : null;
         var chunkReadyToSend = ReadyChunkQueue.takeReady(
                 chunkSendingQueue,
@@ -182,24 +190,78 @@ public final class ChunkLoaderHolder {
                 chunkManager::getChunk,
                 hash -> transferringPlayer == null || transferringPlayer.isDimensionArrivalChunk(hash)
         );
-        chunkReadyToSend.values().forEach(chunk -> chunk.addChunkLoader(chunkLoader));
+        if (chunkReadyToSend.isEmpty()) return;
 
-        if (!chunkReadyToSend.isEmpty()) {
-            if (isActualPlayer()) {
-                // Only really send the chunks if the loader is an actual player
-                var chunkSendingStrategy = AllayServer.getSettings().worldSettings().chunkSendingStrategy();
-                if (chunkSendingStrategy == ASYNC) {
-                    asyncChunkSender.addChunkToSendingQueue(chunkReadyToSend.values());
-                } else {
-                    // Priority is given to sending chunks that are close to the chunk loader
-                    chunkReadyToSend.values()
-                            .stream()
-                            .sorted(chunkDistanceComparator)
-                            .forEachOrdered(player::viewChunk);
-                }
-            }
-
+        if (!isActualPlayer()) {
+            chunkReadyToSend.values().forEach(chunk -> chunk.addChunkLoader(chunkLoader));
             sentChunks.addAll(chunkReadyToSend.keySet());
+            return;
+        }
+
+        var chunkSendingStrategy = AllayServer.getSettings().worldSettings().chunkSendingStrategy();
+        if (chunkSendingStrategy == ASYNC) {
+            for (var chunk : chunkReadyToSend.values()) {
+                long hash = HashUtils.hashXZ(chunk.getX(), chunk.getZ());
+                if (pendingAsyncChunks.contains(hash)) continue;
+                if (!canSendChunk(chunk)) {
+                    deferredChunk(chunk);
+                    chunkSendingQueue.enqueue(hash);
+                    continue;
+                }
+                pendingAsyncChunks.add(hash);
+                asyncChunkSender.addChunkToSendingQueue(java.util.List.of(chunk));
+            }
+        } else {
+            chunkReadyToSend.values().stream()
+                    .sorted(chunkDistanceComparator)
+                    .forEachOrdered(chunk -> {
+                        long hash = HashUtils.hashXZ(chunk.getX(), chunk.getZ());
+                        if (sendChunk(chunk)) {
+                            chunk.addChunkLoader(chunkLoader);
+                            sentChunks.add(hash);
+                        } else {
+                            deferredChunk(chunk);
+                            chunkSendingQueue.enqueue(hash);
+                        }
+                    });
+        }
+    }
+
+    private boolean canSendChunk(Chunk chunk) {
+        return !(player instanceof AllayPlayer allayPlayer) || allayPlayer.canAcceptChunk(chunk);
+    }
+
+    private boolean sendChunk(Chunk chunk) {
+        if (player instanceof AllayPlayer allayPlayer) return allayPlayer.tryViewChunk(chunk);
+        player.viewChunk(chunk);
+        return true;
+    }
+
+    private void deferredChunk(Chunk chunk) {
+        if (!warnedAboutRejectedChunks) {
+            warnedAboutRejectedChunks = true;
+            log.warn("[ChunkDelivery] Chunk deferred due to client dimension handshake: player={}, chunk=({}, {}), dimension={}",
+                    player.getOriginName(), chunk.getX(), chunk.getZ(), chunk.getDimensionType().getIdentifier());
+        }
+    }
+
+    private void processAsyncResults() {
+        ChunkSendResult result;
+        while ((result = asyncResults.poll()) != null) {
+            var chunk = result.chunk();
+            long hash = HashUtils.hashXZ(chunk.getX(), chunk.getZ());
+            pendingAsyncChunks.remove(hash);
+            if (!result.queued()) {
+                deferredChunk(chunk);
+                if (inRadiusChunks.contains(hash)) chunkSendingQueue.enqueue(hash);
+            } else if (inRadiusChunks.contains(hash)) {
+                // Only record/track chunks that made it through the protocol gate.
+                chunk.addChunkLoader(chunkLoader);
+                sentChunks.add(hash);
+            } else {
+                // The player moved out of range while the async packet was being queued.
+                player.removeChunk(hash);
+            }
         }
     }
 
@@ -222,10 +284,20 @@ public final class ChunkLoaderHolder {
             this.isRunning = new AtomicBoolean(true);
             this.senderThread = Thread.ofVirtual().start(() -> {
                 while (isRunning.get()) {
+                    Chunk chunk;
                     try {
-                        player.viewChunk(chunkSendingQueue.take());
+                        chunk = chunkSendingQueue.take();
                     } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                         return;
+                    }
+                    if (!isRunning.get()) return;
+                    try {
+                        asyncResults.add(new ChunkSendResult(chunk, sendChunk(chunk)));
+                    } catch (RuntimeException exception) {
+                        log.error("[ChunkDelivery] Async chunk send FAILED: player={}, chunk=({}, {})",
+                                player.getOriginName(), chunk.getX(), chunk.getZ(), exception);
+                        asyncResults.add(new ChunkSendResult(chunk, false));
                     }
                 }
             });
