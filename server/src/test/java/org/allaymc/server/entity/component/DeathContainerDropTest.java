@@ -48,8 +48,8 @@ class DeathContainerDropTest {
         var inventoryItem = mock(ItemStack.class);
         var protectedItem = mock(ItemStack.class);
 
-        when(inventory.getContainerType()).thenReturn(ContainerTypes.INVENTORY);
-        when(enderChest.getContainerType()).thenReturn(ContainerTypes.ENDER_CHEST);
+        doReturn(ContainerTypes.INVENTORY).when(inventory).getContainerType();
+        doReturn(ContainerTypes.ENDER_CHEST).when(enderChest).getContainerType();
         when(inventory.getItemStacks()).thenReturn(java.util.List.of(inventoryItem));
         when(enderChest.getItemStacks()).thenReturn(java.util.List.of(protectedItem));
 
@@ -67,8 +67,8 @@ class DeathContainerDropTest {
     void keepInventoryLeavesRegularAndEnderChestContentsUntouched() {
         var inventory = mock(Container.class);
         var enderChest = mock(Container.class);
-        when(inventory.getContainerType()).thenReturn(ContainerTypes.INVENTORY);
-        when(enderChest.getContainerType()).thenReturn(ContainerTypes.ENDER_CHEST);
+        doReturn(ContainerTypes.INVENTORY).when(inventory).getContainerType();
+        doReturn(ContainerTypes.ENDER_CHEST).when(enderChest).getContainerType();
 
         var drops = new CEntityGetDropEvent(0);
         new TestHolder(inventory, enderChest, true).onGetDrop(drops);
