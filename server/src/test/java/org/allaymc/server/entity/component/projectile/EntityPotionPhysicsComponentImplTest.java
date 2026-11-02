@@ -59,10 +59,31 @@ class EntityPotionPhysicsComponentImplTest {
     void targetsAtTheRadiusBoundaryReceiveNoEffect() {
         var fixture = new Fixture(PotionType.STRONG_HEALING);
         when(fixture.first.getLocation()).thenReturn(new Location3d(4, 0, 0, fixture.dimension));
+        when(fixture.first.getOffsetAABB()).thenReturn(new AABBd(4, 0, 0, 4, 0, 0));
         fixture.component.splash(null, null);
 
         verify(fixture.first, never()).addEffect(any());
         verify(fixture.second).addEffect(any());
+    }
+
+    @Test
+    void bodyLevelSplashTouchingHitboxGetsFullHealingWithoutDirectEntityCollision() {
+        var fixture = new Fixture(PotionType.STRONG_HEALING);
+        // The target's feet are a block below the splash, but its body touches it.
+        when(fixture.first.getLocation()).thenReturn(new Location3d(0, 0, 0, fixture.dimension));
+        when(fixture.first.getOffsetAABB()).thenReturn(new AABBd(-0.3, 0, -0.3, 0.3, 1.8, 0.3));
+        when(fixture.component.thisEntity.getLocation()).thenReturn(new Location3d(0, 1, 0, fixture.dimension));
+        fixture.component.splash(null, null);
+
+        assertEquals(1.0, effect(fixture.first).getIntensity());
+    }
+
+    @Test
+    void distanceToBoxUsesTheClosestSurfaceInsteadOfTheFeet() {
+        var body = new AABBd(-0.3, 0, -0.3, 0.3, 1.8, 0.3);
+        assertEquals(0.0, EntityPotionPhysicsComponentImpl.distanceToBox(new org.joml.Vector3d(0, 1.4, 0), body));
+        assertEquals(0.7, EntityPotionPhysicsComponentImpl.distanceToBox(new org.joml.Vector3d(1, 1.4, 0), body), 0.00001);
+        assertEquals(2.0, EntityPotionPhysicsComponentImpl.distanceToBox(new org.joml.Vector3d(0, 3.8, 0), body), 0.00001);
     }
 
     private static EffectInstance effect(EntityLiving entity) {
@@ -89,6 +110,9 @@ class EntityPotionPhysicsComponentImplTest {
             when(physics.computeCollidingEntities(any(AABBdc.class))).thenReturn(List.of(first, second));
             when(first.getLocation()).thenReturn(new Location3d(2, 0, 0, dimension));
             when(second.getLocation()).thenReturn(new Location3d(1, 0, 0, dimension));
+            // Degenerate test boxes retain the exact-distance assertions above.
+            when(first.getOffsetAABB()).thenReturn(new AABBd(2, 0, 0, 2, 0, 0));
+            when(second.getOffsetAABB()).thenReturn(new AABBd(1, 0, 0, 1, 0, 0));
             component.thisEntity = projectile;
             component.potionComponent = mock(EntityPotionComponent.class);
             when(component.potionComponent.getPotionType()).thenReturn(type);
