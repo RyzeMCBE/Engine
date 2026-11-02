@@ -1,5 +1,6 @@
 package org.allaymc.server.entity.component.player;
 
+import org.allaymc.api.container.Container;
 import org.allaymc.api.container.ContainerTypes;
 import org.allaymc.api.container.interfaces.ArmorContainer;
 import org.allaymc.api.entity.action.PickedUpAction;
@@ -103,6 +104,13 @@ public class EntityPlayerContainerHolderComponentImpl extends EntityContainerHol
             EnchantmentOptionGenerator.removeEnchantOptions(this.enchantOptions);
             this.enchantOptions.clear();
         }
+    }
+
+    @Override
+    protected boolean shouldDropContents(Container container) {
+        // Ender Chest belongs to the player, and must never be dropped or cleared
+        // by a death event, even when keepInventory is disabled.
+        return container.getContainerType() != ContainerTypes.ENDER_CHEST;
     }
 
     @Override
