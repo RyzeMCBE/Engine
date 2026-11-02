@@ -228,26 +228,47 @@ public class AllayEntityManager implements EntityManager {
     @Override
     public void addEntity(Entity entity, Runnable callback) {
         if (!entity.canBeSpawned()) {
-            log.warn("Trying to add an entity which can't be added! Entity: {}", entity);
+            log.error("[EntityLifecycle] Entity registration refused: entity={}, state={}; registration callback not invoked",
+                    entity, entity.getState());
             return;
         }
 
         if (((EntityBaseComponentImpl) ((EntityImpl) entity).getBaseComponent()).setState(EntityState.SPAWNED_LATER)) {
             queue.add(() -> {
-                addEntityImmediately(entity);
-                callback.run();
+                try {
+                    if (addEntityImmediately(entity)) {
+                        try {
+                            callback.run();
+                        } catch (RuntimeException exception) {
+                            log.error("[EntityLifecycle] Registration callback FAILED: entity={}, state={}",
+                                    entity, entity.getState(), exception);
+                            // Do not silently lose a player's respawn callback. The respawn
+                            // transaction watchdog will also disconnect a stalled client.
+                        }
+                    } else {
+                        log.error("[EntityLifecycle] Registration failed: entity={}, state={}; callback not invoked",
+                                entity, entity.getState());
+                    }
+                } catch (RuntimeException exception) {
+                    log.error("[EntityLifecycle] Entity registration FAILED before callback: entity={}, state={}",
+                            entity, entity.getState(), exception);
+                }
             });
 
             ((AllayWorld) this.dimension.getWorld()).wakeUp();
+        } else {
+            log.error("[EntityLifecycle] Entity state rejected registration: entity={}, state={}; callback not invoked",
+                    entity, entity.getState());
         }
     }
 
-    protected void addEntityImmediately(Entity entity) {
+    protected boolean addEntityImmediately(Entity entity) {
         new EntitySpawnEvent(entity).call();
         var current = entities.putIfAbsent(entity.getRuntimeId(), entity);
         if (current != null) {
-            log.warn("Trying to add an entity which already exists! Entity: {}", entity);
-            return;
+            log.error("[EntityLifecycle] Entity already registered: entity={}, runtimeId={}",
+                    entity, entity.getRuntimeId());
+            return false;
         }
 
         physicsService.addEntity(entity);
@@ -259,18 +280,36 @@ public class AllayEntityManager implements EntityManager {
                 }
             });
         }
-        ((EntityBaseComponentImpl) ((EntityImpl) entity).getBaseComponent()).setState(EntityState.ALIVE);
+        if (!((EntityBaseComponentImpl) ((EntityImpl) entity).getBaseComponent()).setState(EntityState.ALIVE)) {
+            log.error("[EntityLifecycle] Entity registered but ALIVE transition failed: entity={}, state={}",
+                    entity, entity.getState());
+            return false;
+        }
+        return true;
     }
 
     @Override
     public void removeEntity(Entity entity, Runnable callback) {
         if (((EntityBaseComponentImpl) ((EntityImpl) entity).getBaseComponent()).setState(EntityState.DESPAWNED_LATER)) {
             queue.add(() -> {
-                removeEntityImmediately(entity);
-                callback.run();
+                try {
+                    removeEntityImmediately(entity);
+                    try {
+                        callback.run();
+                    } catch (RuntimeException exception) {
+                        log.error("[EntityLifecycle] Removal callback FAILED: entity={}, state={}",
+                                entity, entity.getState(), exception);
+                    }
+                } catch (RuntimeException exception) {
+                    log.error("[EntityLifecycle] Entity removal FAILED before callback: entity={}, state={}",
+                            entity, entity.getState(), exception);
+                }
             });
 
             ((AllayWorld) this.dimension.getWorld()).wakeUp();
+        } else if (entity instanceof EntityPlayer) {
+            log.warn("[EntityLifecycle] Player removal rejected: entity={}, state={}; callback not invoked",
+                    entity, entity.getState());
         }
     }
 
