@@ -51,7 +51,9 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         }
 
         if (failToValidateStackUniqueId(sourItem.getUniqueId(), sourceStackNetworkId)) {
-            log.warn("mismatch source stack unique id!");
+            log.warn("Rejected inventory transfer: source ID mismatch player={} container={} slot={} item={} clientId={} serverId={}",
+                    player.getOriginName(), sourceContainer.getContainerType(), sourceSlot,
+                    sourItem.getItemType().getIdentifier(), sourceStackNetworkId, sourItem.getUniqueId());
             return error();
         }
 
@@ -73,7 +75,9 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         }
 
         if (failToValidateStackUniqueId(destItem.getUniqueId(), destinationStackNetworkId)) {
-            log.warn("mismatch destination stack unique id!");
+            log.warn("Rejected inventory transfer: destination ID mismatch player={} container={} slot={} item={} clientId={} serverId={}",
+                    player.getOriginName(), destinationContainer.getContainerType(), destinationSlot,
+                    destItem.getItemType().getIdentifier(), destinationStackNetworkId, destItem.getUniqueId());
             return error();
         }
 
