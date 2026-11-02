@@ -133,7 +133,12 @@ public abstract class AllayNetworkInterface implements NetworkInterface {
             server.getScheduler().scheduleDelayed(server, () -> {
                 var status = player.getClientState();
                 if (status != ClientState.DISCONNECTED && status.ordinal() < ClientState.IN_GAME.ordinal()) {
-                    log.warn("Session {} didn't log in within {} seconds, disconnecting...", session.getSocketAddress(), maxLoginTime / 20d);
+                    var protocolSession = player.getProtocolSession();
+                    log.warn("Session {} didn't log in within {} seconds, disconnecting: state={}, protocol={}, "
+                                    + "initialChunksQueued/required={}",
+                            session.getSocketAddress(), maxLoginTime / 20d, status,
+                            protocolSession == null ? "not negotiated" : protocolSession.getProtocol().getProtocolVersion(),
+                            player.describeInitialSpawnProgress());
                     player.disconnect(TrKeys.MC_DISCONNECTIONSCREEN_TIMEOUT);
                 }
                 return true;
