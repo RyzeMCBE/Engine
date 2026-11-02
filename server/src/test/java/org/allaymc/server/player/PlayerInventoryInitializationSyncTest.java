@@ -1,9 +1,6 @@
 package org.allaymc.server.player;
 
 import org.allaymc.api.container.ContainerTypes;
-import org.allaymc.api.container.interfaces.ArmorContainer;
-import org.allaymc.api.container.interfaces.InventoryContainer;
-import org.allaymc.api.container.interfaces.OffhandContainer;
 import org.allaymc.api.container.Container;
 import org.allaymc.api.entity.interfaces.EntityPlayer;
 import org.junit.jupiter.api.Test;
