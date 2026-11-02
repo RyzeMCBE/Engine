@@ -1,6 +1,7 @@
 package org.allaymc.server.network.processor.ingame;
 
 import org.allaymc.api.container.ContainerTypes;
+import org.allaymc.api.entity.interfaces.EntityPlayer;
 import org.allaymc.api.item.interfaces.ItemAirStack;
 import org.allaymc.api.player.Player;
 import org.allaymc.server.container.impl.BaseContainer;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.allaymc.api.item.type.ItemTypes.DIAMOND;
+import static org.allaymc.api.item.type.ItemTypes.DIAMOND_HELMET;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -210,5 +212,50 @@ class ItemStackRequestTransferRecoveryTest {
         assertEquals(ItemAirStack.AIR_STACK, inventory.getItemStack(3));
         verify(player).viewContainerContents(chest);
         verify(player).viewContainerContents(inventory);
+    }
+
+    @Test
+    void mismatchedArmorNetworkIdRejectsMoveAndResynchronizesEquipmentBagAndCursor() {
+        var player = playerWithResponses();
+        var actor = mock(EntityPlayer.class);
+        when(player.getControlledEntity()).thenReturn(actor);
+        var armor = new BaseContainer(ContainerTypes.ARMOR);
+        var inventory = new BaseContainer(ContainerTypes.INVENTORY);
+        var offhand = new BaseContainer(ContainerTypes.OFFHAND);
+        var cursor = new BaseContainer(ContainerTypes.CURSOR);
+        var helmet = DIAMOND_HELMET.createItemStack(1);
+        armor.setItemStack(0, helmet, false);
+        doReturn(inventory).when(actor).getContainer(ContainerTypes.INVENTORY);
+        doReturn(armor).when(actor).getContainer(ContainerTypes.ARMOR);
+        doReturn(offhand).when(actor).getContainer(ContainerTypes.OFFHAND);
+        doReturn(cursor).when(actor).getContainer(ContainerTypes.CURSOR);
+        when(player.getOpenedContainers()).thenReturn(Set.of());
+
+        var armorName = new FullContainerName(ContainerSlotType.ARMOR, null);
+        var inventoryName = new FullContainerName(ContainerSlotType.INVENTORY, null);
+        var source = new ItemStackRequestSlotData(ContainerSlotType.ARMOR, 0,
+                helmet.getUniqueId() + 1, armorName);
+        var destination = new ItemStackRequestSlotData(ContainerSlotType.INVENTORY, 3,
+                0, inventoryName);
+
+        var processor = new ItemStackRequestPacketProcessor() {
+            @Override boolean allowRequest(Player ignored, ItemStackRequestAction[] actions) { return true; }
+        };
+        processor.processorHolder.registerProcessor(new PlaceActionProcessor());
+        try (var slots = mockStatic(ContainerActionProcessor.class)) {
+            slots.when(() -> ContainerActionProcessor.getContainerFrom(player, armorName)).thenReturn(armor);
+            slots.when(() -> ContainerActionProcessor.getContainerFrom(player, inventoryName)).thenReturn(inventory);
+            slots.when(() -> ContainerActionProcessor.fromNetworkSlotIndex(armor, 0)).thenReturn(0);
+            slots.when(() -> ContainerActionProcessor.fromNetworkSlotIndex(inventory, 3)).thenReturn(3);
+            processor.handleSync(player, packet(new PlaceAction(1, source, destination)), 0);
+        }
+
+        assertEquals(ItemStackResponseStatus.ERROR, response(player).result());
+        assertEquals(helmet.getUniqueId(), armor.getItemStack(0).getUniqueId());
+        assertEquals(ItemAirStack.AIR_STACK, inventory.getItemStack(3));
+        verify(player).viewContainerContents(inventory);
+        verify(player).viewContainerContents(armor);
+        verify(player).viewContainerContents(offhand);
+        verify(player).viewContainerContents(cursor);
     }
 }

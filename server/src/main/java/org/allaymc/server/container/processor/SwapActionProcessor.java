@@ -38,13 +38,17 @@ public class SwapActionProcessor implements ContainerActionProcessor<SwapAction>
 
         var sourceItem = sourceContainer.getItemStack(sourceSlot);
         if (failToValidateStackUniqueId(sourceItem.getUniqueId(), action.source().stackNetworkId())) {
-            log.warn("mismatch stack unique id!");
+            log.warn("Rejected inventory swap: source ID mismatch player={} container={} slot={} item={} clientId={} serverId={}",
+                    player.getOriginName(), sourceContainer.getContainerType(), sourceSlot,
+                    sourceItem.getItemType().getIdentifier(), action.source().stackNetworkId(), sourceItem.getUniqueId());
             return error();
         }
 
         var destinationItem = destinationContainer.getItemStack(destinationSlot);
         if (failToValidateStackUniqueId(destinationItem.getUniqueId(), action.destination().stackNetworkId())) {
-            log.warn("mismatch stack unique id!");
+            log.warn("Rejected inventory swap: destination ID mismatch player={} container={} slot={} item={} clientId={} serverId={}",
+                    player.getOriginName(), destinationContainer.getContainerType(), destinationSlot,
+                    destinationItem.getItemType().getIdentifier(), action.destination().stackNetworkId(), destinationItem.getUniqueId());
             return error();
         }
 

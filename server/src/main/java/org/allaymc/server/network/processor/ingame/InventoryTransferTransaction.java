@@ -2,6 +2,7 @@ package org.allaymc.server.network.processor.ingame;
 
 import org.allaymc.api.container.Container;
 import org.allaymc.api.container.ContainerViewer;
+import org.allaymc.api.container.ContainerTypes;
 import org.allaymc.api.item.ItemStack;
 import org.allaymc.api.item.interfaces.ItemAirStack;
 import org.allaymc.api.item.type.ItemTypes;
@@ -12,7 +13,9 @@ import org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action
 import org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.SwapAction;
 import org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.TransferItemStackRequestAction;
 
+import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -71,8 +74,26 @@ final class InventoryTransferTransaction {
     /** Send authoritative contents to the actor following an ERROR response. */
     void resyncActor() {
         Set<Container> opened = player.getOpenedContainers();
+        // An armor/cursor rejection can leave the Bedrock UI predicting a
+        // partially completed click across multiple player containers.
+        // Reconcile ALL related stacks, not just the two requested slots.
+        // Never accept an invalid stack ID to "fix" client prediction.
+        Set<Container> sent = Collections.newSetFromMap(new IdentityHashMap<>());
+        boolean equipmentRequest = snapshots.keySet().stream().anyMatch(container ->
+                container.getContainerType() == ContainerTypes.ARMOR
+                        || container.getContainerType() == ContainerTypes.CURSOR);
+        if (equipmentRequest && player.getControlledEntity() != null) {
+            for (var type : List.of(ContainerTypes.INVENTORY, ContainerTypes.ARMOR,
+                    ContainerTypes.OFFHAND, ContainerTypes.CURSOR)) {
+                var container = player.getControlledEntity().getContainer(type);
+                if (container != null && sent.add(container)) {
+                    player.viewContainerContents(container);
+                }
+            }
+        }
         for (var container : snapshots.keySet()) {
-            if (container instanceof AbstractPlayerContainer || opened != null && opened.contains(container)) {
+            if (sent.add(container) && (container instanceof AbstractPlayerContainer
+                    || opened != null && opened.contains(container))) {
                 player.viewContainerContents(container);
             }
         }
