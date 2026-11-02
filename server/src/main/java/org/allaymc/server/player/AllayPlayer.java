@@ -291,6 +291,23 @@ public class AllayPlayer implements Player {
         return this.formIdCounter.getAndIncrement();
     }
 
+    /**
+     * Resends all server-owned player inventories, including the cursor, with
+     * their current item stack network IDs. Also called after the client has
+     * initialized, since join listeners can restore equipment on reconnect.
+     */
+    public void synchronizePlayerInventory() {
+        var actor = getControlledEntity();
+        if (actor == null) return;
+        for (Container container : new Container[]{
+                actor.getContainer(ContainerTypes.INVENTORY),
+                actor.getContainer(ContainerTypes.ARMOR),
+                actor.getContainer(ContainerTypes.OFFHAND),
+                actor.getContainer(ContainerTypes.CURSOR)}) {
+            if (container != null) viewContainerContents(container);
+        }
+    }
+
     protected void onFullyJoin() {
         var server = Server.getInstance();
         var playerManager = server.getPlayerManager();
@@ -303,12 +320,7 @@ public class AllayPlayer implements Player {
         this.controlledEntity.forEachViewers(viewer -> viewer.viewPlayerGameMode(this.controlledEntity));
         viewTime(world.getWorldData().getTimeOfDay());
         viewWeather(world.getWeather());
-        viewContainerContents(this.controlledEntity.getContainer(ContainerTypes.INVENTORY));
-        viewContainerContents(this.controlledEntity.getContainer(ContainerTypes.OFFHAND));
-        viewContainerContents(this.controlledEntity.getContainer(ContainerTypes.ARMOR));
-        // The cursor is a separate authoritative container. A reconnect must reset
-        // the client's predicted cursor stack/network ID before inventory requests.
-        viewContainerContents(this.controlledEntity.getContainer(ContainerTypes.CURSOR));
+        synchronizePlayerInventory();
         viewPlayerAbilities(this);
         viewPlayerListChange(playerManager.getPlayers().values(), true);
         playerManager.getPlayers().values().stream()

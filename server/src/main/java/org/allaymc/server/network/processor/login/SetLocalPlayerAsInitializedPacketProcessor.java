@@ -27,6 +27,9 @@ public class SetLocalPlayerAsInitializedPacketProcessor extends ILoginPacketProc
 
         allayPlayer.setClientState(ClientState.IN_GAME);
         var entity = player.getControlledEntity();
+        // Join listeners can restore the player's full armor set with freshly
+        // assigned IDs. Always send the final state after client initialization.
+        allayPlayer.synchronizePlayerInventory();
         // We only accept player's movement inputs, which are after SetLocalPlayerAsInitializedPacket,
         // So after the player sent SetLocalPlayerAsInitializedPacket, we need to sync the pos with the
         // client, otherwise the client will snap into the ground
