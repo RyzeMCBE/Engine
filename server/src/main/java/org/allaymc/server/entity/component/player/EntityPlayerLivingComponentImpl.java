@@ -346,13 +346,25 @@ public class EntityPlayerLivingComponentImpl extends EntityLivingComponentImpl {
         var deathInfo = lastDamage != null ?
                 lastDamage.getDamageType().getDeathInfo(thisPlayer, lastDamage.getAttacker()) :
                 DamageType.API.getDeathInfo(thisPlayer, null);
+        // A plugin may customize chat and death-screen text independently.
+        // Defaults are intentionally preserved for all existing plugins.
+        var messageEvent = new org.allaymc.server.event.PlayerDeathMessageEvent(
+                thisPlayer, lastDamage, deathInfo);
+        messageEvent.call();
 
         if (thisPlayer.getWorld().getWorldData().<Boolean>getGameRuleValue(GameRule.SHOW_DEATH_MESSAGES)) {
-            Server.getInstance().getMessageChannel().broadcastTranslatable(deathInfo.left(), (Object[]) deathInfo.right());
+            var chat = messageEvent.getChatMessage();
+            if (chat == null) {
+                Server.getInstance().getMessageChannel().broadcastTranslatable(deathInfo.left(), (Object[]) deathInfo.right());
+            } else if (!chat.isBlank()) {
+                Server.getInstance().getMessageChannel().broadcastMessage(chat);
+            }
         }
 
         if (thisPlayer.isActualPlayer()) {
-            thisPlayer.getController().sendDeathInfo(deathInfo);
+            var screen = messageEvent.getDeathScreenMessage();
+            thisPlayer.getController().sendDeathInfo(screen == null
+                    ? deathInfo : new org.allaymc.api.utils.tuple.Pair<>(screen, new String[0]));
         }
     }
 }
