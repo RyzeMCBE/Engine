@@ -140,4 +140,40 @@ class InventoryTransferTransactionTest {
 
         verify(actor, never()).viewContainerContents(chest);
     }
+
+    @Test
+    void failedSlotResolutionSkipsImplicitCraftingGridWithoutSkippingRealWindows() {
+        var player = mock(AllayPlayer.class);
+        var actor = mock(EntityPlayer.class);
+        var inventory = mock(InventoryContainer.class);
+        var craftingGrid = new org.allaymc.server.container.impl.CraftingGridContainerImpl();
+        var chest = new BaseContainer(ContainerTypes.CHEST);
+        when(player.getControlledEntity()).thenReturn(actor);
+        when(actor.getContainer(ContainerTypes.INVENTORY)).thenReturn(inventory);
+        when(player.getOpenedContainers()).thenReturn(Set.of(craftingGrid, chest));
+
+        assertDoesNotThrow(() -> InventoryTransferTransaction.resyncInvalidSlots(player));
+
+        verify(player).viewContainerContents(inventory);
+        verify(player).viewContainerContents(chest);
+        verify(player, never()).viewContainerContents(craftingGrid);
+    }
+
+    @Test
+    void rejectedCraftingGridTransferRecoversPlayerInventoryWithoutSendingAnUnopenedWindow() {
+        var player = mock(AllayPlayer.class);
+        var actor = mock(EntityPlayer.class);
+        var inventory = mock(InventoryContainer.class);
+        var craftingGrid = new org.allaymc.server.container.impl.CraftingGridContainerImpl();
+        when(player.getControlledEntity()).thenReturn(actor);
+        when(actor.getContainer(ContainerTypes.INVENTORY)).thenReturn(inventory);
+        when(player.getOpenedContainers()).thenReturn(Set.of(craftingGrid));
+
+        var transaction = new InventoryTransferTransaction(player);
+        transaction.captureSlot(craftingGrid, 0);
+        assertDoesNotThrow(transaction::resyncActor);
+
+        verify(player).viewContainerContents(inventory);
+        verify(player, never()).viewContainerContents(craftingGrid);
+    }
 }
