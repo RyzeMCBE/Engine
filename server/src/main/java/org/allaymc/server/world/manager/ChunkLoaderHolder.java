@@ -88,6 +88,7 @@ public final class ChunkLoaderHolder {
      * method {@link HashUtils#hashXZ(int, int)}.
      */
     private long lastLoaderChunkPosHashed;
+    private int lastChunkLoadingRadius = Integer.MIN_VALUE;
 
     ChunkLoaderHolder(ChunkManager chunkManager, ChunkLoader chunkLoader) {
         this.chunkManager = chunkManager;
@@ -119,8 +120,11 @@ public final class ChunkLoaderHolder {
     public void tick() {
         long currentLoaderChunkPosHashed;
         var floor = MathUtils.floor(chunkLoader.getLocation());
-        if ((currentLoaderChunkPosHashed = HashUtils.hashXZ(floor.x >> 4, floor.z >> 4)) != lastLoaderChunkPosHashed) {
+        int currentRadius = chunkLoader.getChunkLoadingRadius();
+        if ((currentLoaderChunkPosHashed = HashUtils.hashXZ(floor.x >> 4, floor.z >> 4)) != lastLoaderChunkPosHashed
+                || currentRadius != lastChunkLoadingRadius) {
             lastLoaderChunkPosHashed = currentLoaderChunkPosHashed;
+            lastChunkLoadingRadius = currentRadius;
             updateInRadiusChunks(floor);
             removeOutOfRadiusChunks();
             updateChunkSendingQueue();
