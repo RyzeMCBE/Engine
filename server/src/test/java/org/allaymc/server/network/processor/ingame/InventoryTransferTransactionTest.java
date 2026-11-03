@@ -3,6 +3,8 @@ package org.allaymc.server.network.processor.ingame;
 import org.allaymc.api.container.Container;
 import org.allaymc.api.container.ContainerTypes;
 import org.allaymc.api.container.ContainerViewer;
+import org.allaymc.api.entity.interfaces.EntityPlayer;
+import org.allaymc.server.container.processor.ContainerActionProcessor;
 import org.allaymc.api.item.interfaces.ItemAirStack;
 import org.allaymc.server.container.impl.BaseContainer;
 import org.allaymc.server.player.AllayPlayer;
@@ -20,6 +22,31 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(AllayTestExtension.class)
 class InventoryTransferTransactionTest {
+
+    @Test
+    void unmappedNetworkSlotProducesActionableRejectionInsteadOfNullPointerException() {
+        var inventory = new BaseContainer(ContainerTypes.INVENTORY);
+        var exception = assertThrows(IllegalArgumentException.class,
+                () -> ContainerActionProcessor.fromNetworkSlotIndex(inventory, 999));
+        assertTrue(exception.getMessage().contains("Unmapped network slot 999"));
+    }
+
+    @Test
+    void invalidSlotWithoutSnapshotResyncsEquipmentAndOpenedContainers() {
+        var player = mock(AllayPlayer.class);
+        var actor = mock(EntityPlayer.class);
+        var inventory = new BaseContainer(ContainerTypes.INVENTORY);
+        var openedChest = new BaseContainer(ContainerTypes.CHEST);
+        when(player.getControlledEntity()).thenReturn(actor);
+        when(actor.getContainer(ContainerTypes.INVENTORY)).thenReturn(inventory);
+        when(player.getOpenedContainers()).thenReturn(Set.of(openedChest));
+
+        InventoryTransferTransaction.resyncInvalidSlots(player);
+
+        verify(player).viewContainerContents(inventory);
+        verify(player).viewContainerContents(openedChest);
+        verify(player, times(2)).viewContainerContents(any(Container.class));
+    }
 
     @Test
     void restoresBothStacksAndNetworkIdsAfterRejectedFullTransfer() {
