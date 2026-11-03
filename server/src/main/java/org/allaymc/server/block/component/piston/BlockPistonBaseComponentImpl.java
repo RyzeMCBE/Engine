@@ -460,35 +460,98 @@ public class BlockPistonBaseComponentImpl extends BlockBaseComponentImpl {
     @Override
     public void onBreak(Block block, ItemStack usedItem, Entity entity) {
         super.onBreak(block, usedItem, entity);
+        // Dependent piston parts are implementation details, not independent
+        // player breaks. A claim may correctly reject a synthetic BlockBreakEvent
+        // even after the player has already broken the piston itself.
+        cleanupPiston(block);
+    }
 
-        // Only cascade when directly broken by player/entity, not when broken by code
-        // This prevents infinite recursion between piston and piston arm
-        if (entity == null) {
+    @Override
+    public void onReplace(Block block, BlockState newBlockState, PlayerInteractInfo placementInfo) {
+        // Direct block replacements (commands, world edits, etc.) do not call onBreak.
+        // Cleanup must run while the piston block entity still exists.
+        if (newBlockState.getBlockType() != block.getBlockType()) {
+            cleanupPiston(block);
+        }
+        super.onReplace(block, newBlockState, placementInfo);
+    }
+
+    /**
+     * Removes only this piston's own temporary parts. Called before the piston
+     * block entity is detached, so interrupted movement can be finalized safely.
+     */
+    protected void cleanupPiston(Block block) {
+        var dimension = block.getDimension();
+        var pistonPos = block.getPosition();
+        var facing = getPistonFace(block.getBlockState());
+
+        var blockEntity = dimension.getBlockEntity(pistonPos);
+        if (blockEntity instanceof BlockEntityPistonArm pistonArm && !pistonArm.isFinished()) {
+            finishInterruptedMovement(dimension, pistonPos, facing, pistonArm);
+        }
+
+        // During sticky retraction the head position may now contain the pulled
+        // MOVING_BLOCK (or its final block). Never overwrite that block with air.
+        var armPos = facing.offsetPos(pistonPos);
+        var armState = dimension.getBlockState(armPos);
+        var expectedArm = isSticky() ? BlockTypes.STICKY_PISTON_ARM_COLLISION : BlockTypes.PISTON_ARM_COLLISION;
+        if (armState.getBlockType() != expectedArm) {
             return;
         }
 
-        // When the piston is broken, also break the piston arm if extended
-        var dimension = block.getDimension();
-        var pos = block.getPosition();
-        var blockState = block.getBlockState();
-        BlockFace facing = getPistonFace(blockState);
-        Vector3ic armPos = facing.offsetPos(pos);
+        var armFace = getPistonFace(armState);
+        if (armFace == facing && !dimension.setBlockState(armPos, BlockTypes.AIR.getDefaultState())) {
+            log.warn("Could not clear piston head at {} after removing base at {}", armPos, pistonPos);
+        }
+    }
 
-        var armState = dimension.getBlockState(armPos);
-        if (armState.getBlockType() == BlockTypes.PISTON_ARM_COLLISION ||
-            armState.getBlockType() == BlockTypes.STICKY_PISTON_ARM_COLLISION) {
-            // Check that the arm's facing matches the piston's facing
-            int armFacing = armState.getPropertyValue(FACING_DIRECTION);
-            BlockFace armFace = BlockFace.fromIndex(armFacing);
-            // For horizontal, the stored value is opposite
-            if (armFace.isHorizontal()) {
-                armFace = armFace.opposite();
+    /**
+     * Resolves MOVING_BLOCK placeholders owned by this piston before their
+     * driving block entity disappears. Other pistons' blocks are left untouched.
+     */
+    protected void finishInterruptedMovement(Dimension dimension, Vector3ic pistonPos,
+                                              BlockFace facing, BlockEntityPistonArm pistonArm) {
+        var moveDirection = pistonArm.isExtending() ? facing : facing.opposite();
+        for (var originalPos : pistonArm.getAttachedBlocks()) {
+            var movingPos = moveDirection.offsetPos(originalPos);
+            if (dimension.getBlockState(movingPos).getBlockType() != BlockTypes.MOVING_BLOCK) {
+                continue;
             }
-            if (armFace == facing) {
-                // Use breakBlock with null entity to trigger particles/sound but prevent recursion
-                dimension.breakBlock(armPos, null, null);
+
+            var blockEntity = dimension.getBlockEntity(movingPos);
+            if (!(blockEntity instanceof BlockEntityMovingBlock movingBlock) ||
+                !samePosition(movingBlock.getPistonPos(), pistonPos)) {
+                continue;
+            }
+
+            var originalState = movingBlock.getMovingBlockState();
+            var originalBlockEntityNBT = movingBlock.getMovingBlockEntityNBT();
+            var restoredState = originalState != null ? originalState : BlockTypes.AIR.getDefaultState();
+            if (!dimension.setBlockState(movingPos, restoredState)) {
+                log.warn("Could not finalize moving piston block at {} owned by {}", movingPos, pistonPos);
+                continue;
+            }
+
+            if (originalBlockEntityNBT != null) {
+                var restoredBlockEntity = dimension.getBlockEntity(movingPos);
+                if (restoredBlockEntity != null) {
+                    restoredBlockEntity.loadNBT(originalBlockEntityNBT);
+                } else {
+                    log.warn("Could not restore moved block entity at {}", movingPos);
+                }
+            }
+
+            if (originalState != null) {
+                originalState.getBehavior().onMoved(
+                        new Block(originalState, new org.allaymc.api.math.position.Position3i(movingPos, dimension))
+                );
             }
         }
+    }
+
+    private static boolean samePosition(Vector3ic first, Vector3ic second) {
+        return first != null && second != null &&
+               first.x() == second.x() && first.y() == second.y() && first.z() == second.z();
     }
 
     /**
