@@ -39,6 +39,7 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
         List<ItemStackResponse> encodedResponses = new LinkedList<>();
         List<InventoryTransferTransaction> committedTransfers = new ArrayList<>();
         List<InventoryTransferTransaction> rejectedTransfers = new ArrayList<>();
+        boolean resyncInvalidSlots = false;
 
         label:
         for (var request : packet.getRequests()) {
@@ -73,7 +74,10 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
                 try {
                     transfer = InventoryTransferTransaction.capture((AllayPlayer) player, actions);
                 } catch (RuntimeException exception) {
-                    log.warn("Rejecting item stack request {} with invalid slots", request.requestId(), exception);
+                    log.warn("Rejecting item stack request {} for player {} with invalid slots: {}",
+                            request.requestId(), player.getOriginName(), exception.getMessage());
+                    log.debug("Invalid item stack slot resolution for request {}", request.requestId(), exception);
+                    resyncInvalidSlots = true;
                     encodedResponses.add(new ItemStackResponse(ItemStackResponseStatus.ERROR,
                             request.requestId(), Collections.emptyList()));
                     continue;
@@ -89,7 +93,10 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
                 }
             } catch (RuntimeException exception) {
                 if (transfer != null) rejectedTransfers.add(transfer);
-                log.debug("Rejecting invalid inventory request id={}", request.requestId(), exception);
+                else resyncInvalidSlots = true;
+                log.warn("Rejecting invalid inventory request id={} for player {}: {}",
+                        request.requestId(), player.getOriginName(), exception.getMessage());
+                log.debug("Inventory request validation failed", exception);
                 encodedResponses.add(new ItemStackResponse(ItemStackResponseStatus.ERROR,
                         request.requestId(), Collections.emptyList()));
                 continue;
@@ -169,6 +176,16 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
         log.debug("[DEBUG-STACK-REQUEST] sending ItemStackResponsePacket entries={}", responsePacket.getEntries().size());
 
         allayPlayer.sendPacket(responsePacket);
+
+        // A failed capture has no slot snapshot to recover from. Resend only
+        // server-authoritative contents after the client has received ERROR.
+        if (resyncInvalidSlots) {
+            try {
+                InventoryTransferTransaction.resyncInvalidSlots(allayPlayer);
+            } catch (RuntimeException exception) {
+                log.warn("Failed to resynchronize invalid inventory slots for {}", player.getOriginName(), exception);
+            }
+        }
 
         // Never publish observer updates before the authoritative response.
         // Rejected requests must reconcile the client's predicted inventory.
