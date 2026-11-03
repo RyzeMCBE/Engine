@@ -67,8 +67,10 @@ public class BlockPistonArmCollisionBaseComponentImpl extends BlockBaseComponent
                 pistonFace = pistonFace.opposite();
             }
             if (pistonFace == armFace) {
-                // Use breakBlock with null entity to trigger particles/sound but prevent recursion
-                dimension.breakBlock(pistonPos, null, null);
+                // Preserve the original breaker so claim protection authorizes
+                // the dependent base break just as it authorized the head break.
+                // The base clears its head via setBlockState, avoiding recursion.
+                dimension.breakBlock(pistonPos, usedItem, entity);
             }
         }
     }
