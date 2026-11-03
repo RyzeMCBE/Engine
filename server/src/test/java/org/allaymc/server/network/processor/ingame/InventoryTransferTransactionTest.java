@@ -4,6 +4,7 @@ import org.allaymc.api.container.Container;
 import org.allaymc.api.container.ContainerTypes;
 import org.allaymc.api.container.ContainerViewer;
 import org.allaymc.api.entity.interfaces.EntityPlayer;
+import org.allaymc.api.container.interfaces.InventoryContainer;
 import org.allaymc.server.container.processor.ContainerActionProcessor;
 import org.allaymc.api.item.interfaces.ItemAirStack;
 import org.allaymc.server.container.impl.BaseContainer;
@@ -35,7 +36,7 @@ class InventoryTransferTransactionTest {
     void invalidSlotWithoutSnapshotResyncsEquipmentAndOpenedContainers() {
         var player = mock(AllayPlayer.class);
         var actor = mock(EntityPlayer.class);
-        var inventory = new BaseContainer(ContainerTypes.INVENTORY);
+        var inventory = mock(InventoryContainer.class);
         var openedChest = new BaseContainer(ContainerTypes.CHEST);
         when(player.getControlledEntity()).thenReturn(actor);
         when(actor.getContainer(ContainerTypes.INVENTORY)).thenReturn(inventory);
