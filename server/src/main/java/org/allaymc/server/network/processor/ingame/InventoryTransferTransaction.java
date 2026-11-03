@@ -71,6 +71,33 @@ final class InventoryTransferTransaction {
                 container.setItemStack(index, before, false)));
     }
 
+    /**
+     * A malformed slot may fail before a transfer snapshot exists. After the ERROR response,
+     * resend all player-owned inventories and currently opened containers so the client can
+     * discard predictions without trusting the rejected network slot or its stack ID.
+     */
+    static void resyncInvalidSlots(AllayPlayer player) {
+        Set<Container> sent = Collections.newSetFromMap(new IdentityHashMap<>());
+        var actor = player.getControlledEntity();
+        if (actor != null) {
+            for (var type : List.of(ContainerTypes.INVENTORY, ContainerTypes.ARMOR,
+                    ContainerTypes.OFFHAND, ContainerTypes.CURSOR)) {
+                var container = actor.getContainer(type);
+                if (container != null && sent.add(container)) {
+                    player.viewContainerContents(container);
+                }
+            }
+        }
+        var opened = player.getOpenedContainers();
+        if (opened != null) {
+            for (var container : opened) {
+                if (container != null && sent.add(container)) {
+                    player.viewContainerContents(container);
+                }
+            }
+        }
+    }
+
     /** Send authoritative contents to the actor following an ERROR response. */
     void resyncActor() {
         Set<Container> opened = player.getOpenedContainers();
