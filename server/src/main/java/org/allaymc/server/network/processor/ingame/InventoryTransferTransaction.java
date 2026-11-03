@@ -65,6 +65,13 @@ final class InventoryTransferTransaction {
                         ? ItemAirStack.AIR_STACK : original.copy(false));
     }
 
+    // The 2x2 crafting grid is implicitly visible while the player inventory is open,
+    // but it has no separately registered window ID. Sending ContainerContent for it
+    // via viewContainerContents() throws "This viewer did not open the container".
+    private static boolean hasContentWindow(Container container) {
+        return container.getContainerType() != ContainerTypes.CRAFTING_GRID;
+    }
+
     /** Restore every captured slot, including counts and original stack network IDs. */
     void rollback() {
         snapshots.forEach((container, slots) -> slots.forEach((index, before) ->
@@ -91,7 +98,7 @@ final class InventoryTransferTransaction {
         var opened = player.getOpenedContainers();
         if (opened != null) {
             for (var container : opened) {
-                if (container != null && sent.add(container)) {
+                if (container != null && hasContentWindow(container) && sent.add(container)) {
                     player.viewContainerContents(container);
                 }
             }
@@ -109,7 +116,11 @@ final class InventoryTransferTransaction {
         boolean equipmentRequest = snapshots.keySet().stream().anyMatch(container ->
                 container.getContainerType() == ContainerTypes.ARMOR
                         || container.getContainerType() == ContainerTypes.CURSOR);
-        if (equipmentRequest && player.getControlledEntity() != null) {
+        boolean craftingGridRequest = snapshots.keySet().stream().anyMatch(container ->
+                container.getContainerType() == ContainerTypes.CRAFTING_GRID);
+        // A rejected crafting-grid transfer can also leave predictions in the
+        // inventory/cursor. Reconcile those registered player containers instead.
+        if ((equipmentRequest || craftingGridRequest) && player.getControlledEntity() != null) {
             for (var type : List.of(ContainerTypes.INVENTORY, ContainerTypes.ARMOR,
                     ContainerTypes.OFFHAND, ContainerTypes.CURSOR)) {
                 var container = player.getControlledEntity().getContainer(type);
@@ -119,7 +130,8 @@ final class InventoryTransferTransaction {
             }
         }
         for (var container : snapshots.keySet()) {
-            if (sent.add(container) && (container instanceof AbstractPlayerContainer
+            if (hasContentWindow(container) && sent.add(container)
+                    && (container instanceof AbstractPlayerContainer
                     || opened != null && opened.contains(container))) {
                 player.viewContainerContents(container);
             }

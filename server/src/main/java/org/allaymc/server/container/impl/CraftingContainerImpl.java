@@ -15,11 +15,15 @@ public abstract class CraftingContainerImpl extends BlockContainerImpl implement
     }
 
     protected ItemStack pickOne(int slot) {
-        if (isEmpty(slot)) {
+        var item = getItemStack(slot);
+        // Container.isEmpty() compares the singleton AIR_STACK by identity.
+        // Network/NBT operations may yield a different AIR instance (even with
+        // a non-zero count). Recipe inputs must always normalize AIR to count 0.
+        if (item.isEmptyOrAir()) {
             return ItemAirStack.AIR_STACK;
         }
 
-        var copy = getItemStack(slot).copy(false);
+        var copy = item.copy(false);
         copy.setCount(1);
         return copy;
     }
