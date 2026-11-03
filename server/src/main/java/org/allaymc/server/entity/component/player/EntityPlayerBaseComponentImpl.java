@@ -116,7 +116,8 @@ public class EntityPlayerBaseComponentImpl extends EntityBaseComponentImpl imple
     protected int enchantmentSeed;
 
     @Getter
-    protected boolean usingItemOnBlock, usingItemInAir;
+    protected boolean usingItemOnBlock;
+    protected boolean usingItemInAir;
     protected long startUsingItemInAirTime;
     protected ItemStack usingItemInAirStack;
     protected int usingItemInAirSlot = -1;

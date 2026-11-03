@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Offline staging of SHARED <-> SEPARATE LevelDB layouts. Never mutates source
+ * Offline staging of SHARED &lt;-&gt; SEPARATE LevelDB layouts. Never mutates source
  * databases or replaces running worlds. The caller must supply closed,
  * verified source copies and fresh, disjoint candidate paths, then use a
  * separately journaled promotion to install a complete layout.
