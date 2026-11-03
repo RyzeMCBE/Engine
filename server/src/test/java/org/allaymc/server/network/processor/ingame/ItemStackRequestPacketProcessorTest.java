@@ -15,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import org.cloudburstmc.protocol.bedrock.data.inventory.ContainerSlotType;
 import org.cloudburstmc.protocol.bedrock.data.inventory.FullContainerName;
 import org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.ItemStackRequestSlotData;
@@ -40,6 +41,39 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ItemStackRequestPacketProcessorTest {
+
+    @Test
+    void failedTransferCaptureResynchronizesOpenedContainersAfterErrorResponse() {
+        var player = mock(AllayPlayer.class);
+        var protocol = mock(Protocol.class);
+        var encoder = mock(PacketEncoder.class);
+        var openedChest = mock(Container.class);
+        var name = new FullContainerName(ContainerSlotType.INVENTORY, null);
+        var invalid = new ItemStackRequestSlotData(ContainerSlotType.INVENTORY, 999, 1, name);
+        var valid = new ItemStackRequestSlotData(ContainerSlotType.INVENTORY, 0, 0, name);
+        var packet = new ItemStackRequestPacket();
+        packet.getRequests().add(new ItemStackRequest(-99,
+                new ItemStackRequestAction[]{new PlaceAction(1, invalid, valid)}, new String[0]));
+        when(player.getProtocol()).thenReturn(protocol);
+        when(player.getOpenedContainers()).thenReturn(Set.of(openedChest));
+        when(protocol.getEncoder()).thenReturn(encoder);
+        when(encoder.encodeItemStackResponse(any())).thenAnswer(invocation -> {
+            Collection<ItemStackResponse> responses = invocation.getArgument(0);
+            var result = new ItemStackResponsePacket();
+            result.getEntries().addAll(responses);
+            return result;
+        });
+        try (var containers = mockStatic(ContainerActionProcessor.class)) {
+            containers.when(() -> ContainerActionProcessor.getContainerFrom(player, name)).thenReturn(openedChest);
+            containers.when(() -> ContainerActionProcessor.fromNetworkSlotIndex(openedChest, 999))
+                    .thenThrow(new IllegalArgumentException("Unmapped network slot 999"));
+            new ItemStackRequestPacketProcessor().handleSync(player, packet, 0);
+        }
+        var response = ArgumentCaptor.forClass(ItemStackResponsePacket.class);
+        verify(player).sendPacket(response.capture());
+        assertEquals(ItemStackResponseStatus.ERROR, response.getValue().getEntries().getFirst().result());
+        verify(player).viewContainerContents(openedChest);
+    }
 
     @Test
     void nativeSlotResolutionDeliversACancellableImmutableRequest() {
