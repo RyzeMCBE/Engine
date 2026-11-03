@@ -166,15 +166,15 @@ class PistonBreakCleanupTest {
         final Dimension dimension = mock(Dimension.class, CALLS_REAL_METHODS);
 
         TestWorld() {
-            doAnswer(call -> state(new Vector3i(call.getArgument(0), call.getArgument(1), call.getArgument(2))))
+            doAnswer(call -> state(new Vector3i(call.<Integer>getArgument(0), call.<Integer>getArgument(1), call.<Integer>getArgument(2))))
                     .when(dimension).getBlockState(anyInt(), anyInt(), anyInt(), anyInt());
             doAnswer(call -> {
-                var pos = new Vector3i(call.getArgument(0), call.getArgument(1), call.getArgument(2));
+                var pos = new Vector3i(call.<Integer>getArgument(0), call.<Integer>getArgument(1), call.<Integer>getArgument(2));
                 set(pos, call.getArgument(3));
                 return true;
             }).when(dimension).setBlockState(anyInt(), anyInt(), anyInt(), any(BlockState.class),
                     anyInt(), anyBoolean(), anyBoolean(), anyBoolean(), nullable(PlayerInteractInfo.class));
-            doAnswer(call -> tiles.get(new Vector3i(call.getArgument(0), call.getArgument(1), call.getArgument(2))))
+            doAnswer(call -> tiles.get(new Vector3i(call.<Integer>getArgument(0), call.<Integer>getArgument(1), call.<Integer>getArgument(2))))
                     .when(dimension).getBlockEntity(anyInt(), anyInt(), anyInt());
         }
 
