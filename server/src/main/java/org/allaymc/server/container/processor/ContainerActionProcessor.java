@@ -97,7 +97,20 @@ public interface ContainerActionProcessor<T extends ItemStackRequestAction> {
     }
 
     static int fromNetworkSlotIndex(Container container, int index) {
-        return ContainerNetworkInfo.getInfo(container.getContainerType()).networkSlotIndexMapper().get(index);
+        if (container == null) {
+            throw new IllegalArgumentException("No container is available for network slot " + index);
+        }
+        var info = ContainerNetworkInfo.getInfo(container.getContainerType());
+        if (info == null) {
+            throw new IllegalArgumentException("No network slot mapping for container " + container.getContainerType());
+        }
+        Integer slot = info.networkSlotIndexMapper().get(index);
+        if (slot == null || slot < 0 || slot >= container.getItemStackArray().length) {
+            throw new IllegalArgumentException("Unmapped network slot " + index
+                    + " (containerNetworkId=" + info.networkId()
+                    + ", containerSize=" + container.getItemStackArray().length + ")");
+        }
+        return slot;
     }
 
     static boolean tryHandleFakeContainer(Container source, int sourceSlot, Container destination, int destinationSlot) {
