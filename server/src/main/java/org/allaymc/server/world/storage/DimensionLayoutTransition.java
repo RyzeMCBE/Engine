@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Automatic offline SHARED <-> SEPARATE layout transition for one logical
+ * Automatic offline SHARED &lt;-&gt; SEPARATE layout transition for one logical
  * world. Uses permanent verified backups, scratch copies, staged LevelDB
  * databases, and a multi-directory recovery journal.
  *

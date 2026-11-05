@@ -55,12 +55,12 @@ public class AllayLightEngine implements LightEngine {
     protected final NonBlockingHashMapLong<ChunkSectionNibbleArray[]> blockLight;
     protected final LightPropagator blockLightPropagator;
     /**
-     * The light data accessor used in "Chunk & Block" thread. We use LightDataAccessor as much
+     * The light data accessor used in "Chunk &amp; Block" thread. We use LightDataAccessor as much
      * as possible, because the implementation of LightDataAccessor will cache the last reading
      * chunk and avoid getting chunk from large hash table every time (which will be much faster)
      * To avoid race conditions, we limit the read and write threads for various data:
      * Light (Sky Light) - Sky Light Calculating Thread
-     * Light Dampening&Emission - Chunk & Block Light Calculation Thread
+     * Light Dampening&amp;Emission - Chunk &amp; Block Light Calculation Thread
      */
     protected final CachedLightDataAccessor lightDataAccessor;
 

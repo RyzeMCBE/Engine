@@ -27,7 +27,7 @@ public class FortuneDropHelper {
      * @param minBase  minimum number of drops without Fortune
      * @param maxBase  maximum number of drops without Fortune
      * @return the calculated drop amount
-     * @throws IllegalArgumentException if maxBase < minBase
+     * @throws IllegalArgumentException if maxBase &lt; minBase
      */
     public static int weighted(ItemStack usedItem, int minBase, int maxBase) {
         Preconditions.checkArgument(maxBase >= minBase, "Maximum drop amount must be greater than or equal to minimum drop amount");
@@ -94,7 +94,7 @@ public class FortuneDropHelper {
      * @param baseMax  maximum number of drops without Fortune
      * @param maxCap   absolute maximum drops regardless of Fortune level
      * @return the calculated drop amount
-     * @throws IllegalArgumentException if baseMax < baseMin
+     * @throws IllegalArgumentException if baseMax &lt; baseMin
      */
     public static int discrete(ItemStack usedItem, int baseMin, int baseMax, int maxCap) {
         Preconditions.checkArgument(baseMax >= baseMin, "Maximum base drop amount must be greater than or equal to minimum base drop amount");
