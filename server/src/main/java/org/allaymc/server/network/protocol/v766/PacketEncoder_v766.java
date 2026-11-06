@@ -272,7 +272,9 @@ public class PacketEncoder_v766 extends PacketEncoder {
     public ResourcePackStackPacket encodeResourcePackStack() {
         var settings = AllayServer.getSettings().resourcePackSettings();
         var packet = new ResourcePackStackPacket();
-        packet.setForcedToAccept(settings.forceResourcePacks() && !settings.allowClientResourcePacks());
+        // Requiring the server's packs is independent of whether the player
+        // may also use their own local resource packs.
+        packet.setForcedToAccept(settings.forceResourcePacks());
         packet.setGameVersion("*");
         packet.getExperiments().addAll(createExperiments());
 
