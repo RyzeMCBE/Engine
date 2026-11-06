@@ -19,14 +19,15 @@ resource-pack-settings:
   allow-client-resource-packs: false
   max-chunk-size: 100
   disable-vibrant-visuals: false
-  selected-subpacks:
-    "11111111-1111-4111-8111-111111111111": SP2
 ```
 
-Replace the example UUID with `header.uuid` from **your distributable pack's**
-manifest. The value (e.g. `SP2`) must match the exact
-`subpacks[].folder_name`. Omit a UUID mapping to use the pack's default
-selection. Unknown subpack names are warned about and ignored.
+Subpacks are selected **automatically by Minecraft Bedrock**, using the
+`subpacks` entries and the client's memory performance tier. Do not add a
+`selected-subpacks` mapping or edit the pack UUID. When several subpacks
+have the same tier, Bedrock chooses the last declared. A pack declaring
+`SP0`, `SP1` and `SP2` with all three tiers set to 0 therefore defaults
+to `SP2`. The server advertises an empty subpack override so the client
+can apply its normal default rules.
 
 - `force-resource-packs: true` prompts the player to accept server packs
   before entering. If they decline, they cannot join while the pack is required.
