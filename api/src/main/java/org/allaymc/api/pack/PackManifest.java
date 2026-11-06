@@ -42,6 +42,11 @@ public class PackManifest {
 
     private List<Module> modules = Collections.emptyList();
     private List<Capability> capabilities = Collections.emptyList();
+    private List<SubPack> subpacks = Collections.emptyList();
+
+    // Bedrock manifest v3 can also define user-facing pack settings. Retain them
+    // without forcing the server to interpret client-side configuration options.
+    private JsonArray settings;
 
     /**
      * Load pack manifest using the given loader.
@@ -89,7 +94,10 @@ public class PackManifest {
         return this.header.description != null &&
                this.header.name != null &&
                this.header.uuid != null &&
-               this.header.version != null;
+               this.header.version != null &&
+               !this.modules.isEmpty() &&
+               this.modules.getFirst() != null &&
+               this.modules.getFirst().getType() != null;
     }
 
     public enum Capability {
@@ -97,7 +105,9 @@ public class PackManifest {
         CHEMISTRY,
         EDITOREXTENSION,
         EXPERIMENTAL_CUSTOM_UI,
-        RAYTRACED;
+        RAYTRACED,
+        PBR,
+        UNKNOWN;
 
         public static class Serializer implements JsonSerializer<Capability> {
 
@@ -111,7 +121,13 @@ public class PackManifest {
 
             @Override
             public Capability deserialize(JsonElement json, java.lang.reflect.Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
-                return Capability.valueOf(json.getAsString().toUpperCase(Locale.ROOT));
+                try {
+                    return Capability.valueOf(json.getAsString().toUpperCase(Locale.ROOT));
+                } catch (IllegalArgumentException ignored) {
+                    // Future Bedrock capabilities should not prevent an otherwise
+                    // valid pack from loading.
+                    return Capability.UNKNOWN;
+                }
             }
         }
     }
@@ -123,6 +139,17 @@ public class PackManifest {
         private String description;
         private UUID uuid;
         private PackVersion version;
+        @SerializedName("min_engine_version")
+        private String minEngineVersion;
+    }
+
+    @Data
+    public static class SubPack {
+        @SerializedName("folder_name")
+        private String folderName;
+        private String name;
+        @SerializedName("memory_performance_tier")
+        private int memoryPerformanceTier;
     }
 
     @Data
