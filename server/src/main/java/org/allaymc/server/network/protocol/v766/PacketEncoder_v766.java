@@ -59,6 +59,7 @@ import org.allaymc.server.container.ContainerNetworkInfo;
 import org.allaymc.server.container.impl.UnopenedContainerId;
 import org.allaymc.server.container.processor.ContainerActionProcessor;
 import org.allaymc.server.network.NetworkHelper;
+import org.allaymc.server.pack.PackSubpackSelection;
 import org.allaymc.server.network.protocol.PacketEncoder;
 import org.allaymc.server.network.protocol.ProtocolData;
 import org.allaymc.server.player.ChunkCache;
@@ -278,7 +279,7 @@ public class PacketEncoder_v766 extends PacketEncoder {
         for (var pack : Registries.PACKS.getContent().values()) {
             switch (pack.getType()) {
                 case RESOURCES -> packet.getResourcePacks().add(new ResourcePackStackPacket.Entry(
-                        pack.getId().toString(), pack.getStringVersion(), ""));
+                        pack.getId().toString(), pack.getStringVersion(), selectedSubpack(pack)));
                 case DATA -> packet.getBehaviorPacks().add(new ResourcePackStackPacket.Entry(
                         pack.getId().toString(), pack.getStringVersion(), ""));
                 case WORLD_TEMPLATE, SCRIPT -> {
@@ -2639,6 +2640,12 @@ packet.setAction(action);
         );
     }
 
+    private static String selectedSubpack(Pack pack) {
+        var requested = AllayServer.getSettings().resourcePackSettings()
+                .selectedSubpacks().get(pack.getId().toString());
+        return PackSubpackSelection.resolve(pack.getManifest(), requested);
+    }
+
     private static ResourcePacksInfoPacket.Entry createResourcePackInfo(
             Pack pack,
             boolean scripting,
@@ -2649,7 +2656,7 @@ packet.setAction(action);
                 pack.getStringVersion(),
                 pack.getSize(),
                 pack.getContentKey(),
-                "",
+                selectedSubpack(pack),
                 pack.getId().toString(),
                 scripting,
                 pack.getManifest().getCapabilities().contains(PackManifest.Capability.RAYTRACED),
