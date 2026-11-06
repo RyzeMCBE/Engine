@@ -5,6 +5,7 @@ import org.allaymc.api.player.Player;
 import org.allaymc.api.registry.Registries;
 import org.allaymc.server.AllayServer;
 import org.allaymc.server.network.processor.ingame.ILoginPacketProcessor;
+import org.allaymc.server.pack.PackCompatibility;
 import org.allaymc.server.player.AllayPlayer;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacketType;
 import org.cloudburstmc.protocol.bedrock.packet.ResourcePackClientResponsePacket;
@@ -35,7 +36,7 @@ public class ResourcePackClientResponsePacketProcessor extends ILoginPacketProce
                     }
 
                     var pack = Registries.PACKS.get(id);
-                    if (pack == null) {
+                    if (!PackCompatibility.supports(pack, allayPlayer.getLoginData().getGameVersion())) {
                         player.disconnect(TrKeys.MC_DISCONNECTIONSCREEN_RESOURCEPACK);
                         return;
                     }
@@ -45,7 +46,13 @@ public class ResourcePackClientResponsePacketProcessor extends ILoginPacketProce
             }
             case HAVE_ALL_PACKS -> {
                 var encoder = allayPlayer.getProtocol().getEncoder();
-                allayPlayer.sendPacket(encoder.encodeResourcePackStack());
+                var stack = encoder.encodeResourcePackStack();
+                var gameVersion = allayPlayer.getLoginData().getGameVersion();
+                stack.getResourcePacks().removeIf(entry -> !PackCompatibility.supports(
+                        Registries.PACKS.get(UUID.fromString(entry.getPackId())), gameVersion));
+                stack.getBehaviorPacks().removeIf(entry -> !PackCompatibility.supports(
+                        Registries.PACKS.get(UUID.fromString(entry.getPackId())), gameVersion));
+                allayPlayer.sendPacket(stack);
             }
             case COMPLETED -> allayPlayer.spawnEntityPlayer();
             default -> player.disconnect(TrKeys.MC_DISCONNECTIONSCREEN_NOREASON);
