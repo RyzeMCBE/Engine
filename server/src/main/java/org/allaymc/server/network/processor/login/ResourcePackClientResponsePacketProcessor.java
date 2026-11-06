@@ -49,9 +49,9 @@ public class ResourcePackClientResponsePacketProcessor extends ILoginPacketProce
                 var stack = encoder.encodeResourcePackStack();
                 var gameVersion = allayPlayer.getLoginData().getGameVersion();
                 stack.getResourcePacks().removeIf(entry -> !PackCompatibility.supports(
-                        Registries.PACKS.get(UUID.fromString(entry.getPackId())), gameVersion));
+                        Registries.PACKS.get(UUID.fromString(entry.packId())), gameVersion));
                 stack.getBehaviorPacks().removeIf(entry -> !PackCompatibility.supports(
-                        Registries.PACKS.get(UUID.fromString(entry.getPackId())), gameVersion));
+                        Registries.PACKS.get(UUID.fromString(entry.packId())), gameVersion));
                 allayPlayer.sendPacket(stack);
             }
             case COMPLETED -> allayPlayer.spawnEntityPlayer();
