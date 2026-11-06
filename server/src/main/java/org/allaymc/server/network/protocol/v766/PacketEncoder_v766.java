@@ -281,7 +281,7 @@ public class PacketEncoder_v766 extends PacketEncoder {
                 case RESOURCES -> packet.getResourcePacks().add(new ResourcePackStackPacket.Entry(
                         pack.getId().toString(), pack.getStringVersion(), selectedSubpack(pack)));
                 case DATA -> packet.getBehaviorPacks().add(new ResourcePackStackPacket.Entry(
-                        pack.getId().toString(), pack.getStringVersion(), ""));
+                        pack.getId().toString(), pack.getStringVersion(), selectedSubpack(pack)));
                 case WORLD_TEMPLATE, SCRIPT -> {
                 }
             }
