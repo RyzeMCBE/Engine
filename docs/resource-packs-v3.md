@@ -45,8 +45,12 @@ selection. Unknown subpack names are warned about and ignored.
 ## Marketplace content
 
 For purchased Marketplace packs, players should activate their licensed copy
-in Minecraft's resource settings. Engine's generic resource-pack downloader
-must not be used to distribute that paid content without permission.
+in Minecraft's resource settings. To allow players to use their own packs
+without distributing assets, use `allow-client-resource-packs: true` and,
+when no authorized server packs are installed, `force-resource-packs: false`.
+Engine's generic resource-pack downloader must not be used to distribute that
+paid content without permission. Client-side global resources may still be
+affected by the player's own pack order and Minecraft platform restrictions.
 
 ## Testing
 
