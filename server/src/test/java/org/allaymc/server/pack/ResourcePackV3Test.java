@@ -71,12 +71,15 @@ class ResourcePackV3Test {
     }
 
     @Test
-    void selectsOnlyDeclaredSubpacks() {
+    void keepsAutomaticSubpackOrderAndPerformanceTiers() {
         var manifest = PackManifest.fromJson(new StringReader(MANIFEST));
-        assertEquals("SP2", PackSubpackSelection.resolve(manifest, "SP2"));
-        assertEquals("", PackSubpackSelection.resolve(manifest, "SP9"));
-        assertEquals("", PackSubpackSelection.resolve(manifest, ""));
-        assertEquals("", PackSubpackSelection.resolve(manifest, null));
+        // The server does not choose a subpack; Bedrock uses these
+        // declarations to select the best variant for the client's device.
+        assertEquals(2, manifest.getSubpacks().size());
+        assertEquals("SP0", manifest.getSubpacks().get(0).getFolderName());
+        assertEquals("SP2", manifest.getSubpacks().get(1).getFolderName());
+        assertEquals(0, manifest.getSubpacks().get(0).getMemoryPerformanceTier());
+        assertEquals(1, manifest.getSubpacks().get(1).getMemoryPerformanceTier());
     }
 
     @Test
