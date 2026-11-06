@@ -83,6 +83,40 @@ class ResourcePackV3Test {
     }
 
     @Test
+    void automaticallySelectsLastEqualTierSubpackWithoutConfig() {
+        var json = com.google.gson.JsonParser.parseString(MANIFEST).getAsJsonObject();
+        var subpacks = json.getAsJsonArray("subpacks");
+        subpacks.get(1).getAsJsonObject().addProperty("memory_performance_tier", 0);
+        var manifest = PackManifest.fromJson(new StringReader(json.toString()));
+
+        assertEquals("SP2", AutomaticSubpackSelector.select(manifest),
+                "Equal baseline memory tiers should select the last variant");
+    }
+
+    @Test
+    void doesNotForceHighOrMixedTierSubpacksOnLowerEndClients() {
+        var manifest = PackManifest.fromJson(new StringReader(MANIFEST));
+        assertEquals("", AutomaticSubpackSelector.select(manifest),
+                "Mixed tiers must be delegated to the client");
+
+        var json = com.google.gson.JsonParser.parseString(MANIFEST).getAsJsonObject();
+        for (var subpack : json.getAsJsonArray("subpacks")) {
+            subpack.getAsJsonObject().addProperty("memory_performance_tier", 5);
+        }
+        var hdManifest = PackManifest.fromJson(new StringReader(json.toString()));
+        assertEquals("", AutomaticSubpackSelector.select(hdManifest),
+                "Do not force a high tier onto clients of unknown memory capacity");
+    }
+
+    @Test
+    void noSubpacksMeansNoSelectedVariant() {
+        var json = com.google.gson.JsonParser.parseString(MANIFEST).getAsJsonObject();
+        json.add("subpacks", new com.google.gson.JsonArray());
+        assertEquals("", AutomaticSubpackSelector.select(
+                PackManifest.fromJson(new StringReader(json.toString()))));
+    }
+
+    @Test
     void skipsIncompatiblePacksButAllowsOldClientsWithOtherPacks() {
         var manifest = PackManifest.fromJson(new StringReader(MANIFEST));
         assertFalse(PackCompatibility.supports(manifest, "1.26.30"));
