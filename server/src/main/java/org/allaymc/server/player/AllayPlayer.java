@@ -2313,6 +2313,12 @@ public class AllayPlayer implements Player {
         // older supported clients joinable without presenting incompatible assets.
         packInfo.getResourcePackInfos().removeIf(entry -> !PackCompatibility.supports(
                 Registries.PACKS.get(entry.getPackId()), loginData.getGameVersion()));
+        // The current player's pack list can be empty even if the server has
+        // packs configured for newer versions. Do not require accepting an
+        // empty pack list on old Bedrock clients.
+        if (packInfo.getResourcePackInfos().isEmpty() && packInfo.getBehaviorPackInfos().isEmpty()) {
+            packInfo.setForcedToAccept(false);
+        }
         sendPacket(packInfo);
     }
 
