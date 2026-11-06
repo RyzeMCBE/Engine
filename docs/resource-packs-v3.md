@@ -21,13 +21,19 @@ resource-pack-settings:
   disable-vibrant-visuals: false
 ```
 
-Subpacks are selected **automatically by Minecraft Bedrock**, using the
-`subpacks` entries and the client's memory performance tier. Do not add a
-`selected-subpacks` mapping or edit the pack UUID. When several subpacks
-have the same tier, Bedrock chooses the last declared. A pack declaring
-`SP0`, `SP1` and `SP2` with all three tiers set to 0 therefore defaults
-to `SP2`. The server advertises an empty subpack override so the client
-can apply its normal default rules.
+Subpacks are selected **automatically** without a `selected-subpacks`
+setting, custom UUID configuration, or modifying the pack itself. Engine
+inspects the manifest: if every declared subpack uses the universal baseline
+memory tier (0 or 1), it advertises the **last declared** subpack in both
+the pack info and stack packets, following Bedrock's tie-breaking rules.
+For example, `SP0`, `SP1` and `SP2` all at tier 0 automatically
+select `SP2`.
+
+For a pack with **different** tiers or a higher common tier, Engine
+advertises an empty override instead of forcing high-resolution assets
+onto low-memory devices. The Minecraft client must resolve the appropriate
+variant. Because this can depend on the client's platform and cache state,
+confirm with a real Bedrock client during deployment.
 
 - `force-resource-packs: true` prompts the player to accept server packs
   before entering. If they decline, they cannot join while the pack is required.
@@ -58,7 +64,7 @@ affected by the player's own pack order and Minecraft platform restrictions.
 `./gradlew :server:test --tests org.allaymc.server.pack.ResourcePackV3Test`
 
 The tests use a synthetic pack (no Marketplace assets) and cover v3 manifest
-parsing, PBR, subpack selection, per-version filtering, and the critical ZIP
+parsing, PBR, automatic tier-0/1 subpack selection, per-version filtering, and the critical ZIP
 case where `subpacks/SP*/` directories have no explicit directory entries.
 
 Before deploying, test with a real Bedrock client of a supported version
