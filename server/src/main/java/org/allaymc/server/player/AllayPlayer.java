@@ -85,6 +85,7 @@ import org.allaymc.server.eventbus.event.network.PacketReceiveEvent;
 import org.allaymc.server.eventbus.event.network.PacketSendEvent;
 import org.allaymc.server.network.AllayNetworkInterface;
 import org.allaymc.server.network.NetworkHelper;
+import org.allaymc.server.pack.PackCompatibility;
 import org.allaymc.server.network.processor.PacketProcessorHolder;
 import org.allaymc.server.network.processor.PacketProcessorRegistry;
 import org.allaymc.server.network.processor.login.RequestNetworkSettingsPacketProcessor;
@@ -2307,7 +2308,12 @@ public class AllayPlayer implements Player {
 
         setClientState(ClientState.LOGGED_IN);
         sendPlayStatus(PlayStatusPacket.Status.LOGIN_SUCCESS);
-        sendPacket(getProtocol().getEncoder().encodeResourcePacksInfo());
+        var packInfo = getProtocol().getEncoder().encodeResourcePacksInfo();
+        // Do not advertise packs requiring a newer Bedrock client. This keeps
+        // older supported clients joinable without presenting incompatible assets.
+        packInfo.getResourcePackInfos().removeIf(entry -> !PackCompatibility.supports(
+                Registries.PACKS.get(entry.getPackId()), loginData.getGameVersion()));
+        sendPacket(packInfo);
     }
 
     protected void sendPlayStatus(PlayStatusPacket.Status status) {
