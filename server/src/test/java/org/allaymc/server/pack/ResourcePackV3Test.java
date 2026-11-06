@@ -64,6 +64,17 @@ class ResourcePackV3Test {
     }
 
     @Test
+    void skipsIncompatiblePacksButAllowsOldClientsWithOtherPacks() {
+        var manifest = PackManifest.fromJson(new StringReader(MANIFEST));
+        assertFalse(PackCompatibility.supports(manifest, "1.26.30"));
+        assertTrue(PackCompatibility.supports(manifest, "1.26.40"));
+        assertTrue(PackCompatibility.supports(manifest, "1.26.60"));
+        assertTrue(PackCompatibility.supports(manifest, "1.26.60.1"));
+        assertFalse(PackCompatibility.supports(manifest, "not-a-version"));
+        assertTrue(PackCompatibility.isAtLeast("1.27.0", "1.26.40"));
+    }
+
+    @Test
     void refusesManifestWithNoModules() {
         // A malformed manifest must be rejected instead of crashing the loader.
         var json = com.google.gson.JsonParser.parseString(MANIFEST).getAsJsonObject();
