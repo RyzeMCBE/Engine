@@ -25,8 +25,8 @@ public final class PackCompatibility {
     public static boolean supports(PackManifest manifest, String minecraftVersion) {
         if (manifest == null || manifest.getHeader() == null) return false;
         var minimum = manifest.getHeader().getMinEngineVersion();
-        if (minimum == null || minimum.isBlank()) return true;
-        return isAtLeast(minecraftVersion, minimum);
+        if (minimum == null) return true;
+        return isAtLeast(minecraftVersion, minimum.getVersion());
     }
 
     public static boolean isAtLeast(String client, String minimum) {
