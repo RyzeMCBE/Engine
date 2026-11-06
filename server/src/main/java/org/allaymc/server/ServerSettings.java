@@ -10,9 +10,7 @@ import org.allaymc.api.message.LangCode;
 import org.allaymc.api.player.GameMode;
 import org.allaymc.api.world.data.Difficulty;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -382,10 +380,6 @@ public class ServerSettings extends OkaeriConfig {
         @Comment("If set to true, the client resource packs will be allowed")
         @CustomKey("allow-client-resource-packs")
         private boolean allowClientResourcePacks = false;
-
-        @CustomKey("selected-subpacks")
-        @Comment("Optional pack UUID -> subpack folder_name mapping, e.g. <uuid>: SP2. Empty uses the pack default")
-        private Map<String, String> selectedSubpacks = new HashMap<>();
 
         @Comment("If set to true, all skins will be marked as trusted")
         @CustomKey("trust-all-skins")
