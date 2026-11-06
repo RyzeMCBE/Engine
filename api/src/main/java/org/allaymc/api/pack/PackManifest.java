@@ -140,7 +140,7 @@ public class PackManifest {
         private UUID uuid;
         private PackVersion version;
         @SerializedName("min_engine_version")
-        private String minEngineVersion;
+        private PackVersion minEngineVersion;
     }
 
     @Data
