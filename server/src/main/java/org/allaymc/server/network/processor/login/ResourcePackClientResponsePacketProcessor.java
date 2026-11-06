@@ -52,6 +52,9 @@ public class ResourcePackClientResponsePacketProcessor extends ILoginPacketProce
                         Registries.PACKS.get(UUID.fromString(entry.packId())), gameVersion));
                 stack.getBehaviorPacks().removeIf(entry -> !PackCompatibility.supports(
                         Registries.PACKS.get(UUID.fromString(entry.packId())), gameVersion));
+                if (stack.getResourcePacks().isEmpty() && stack.getBehaviorPacks().isEmpty()) {
+                    stack.setForcedToAccept(false);
+                }
                 allayPlayer.sendPacket(stack);
             }
             case COMPLETED -> allayPlayer.spawnEntityPlayer();
