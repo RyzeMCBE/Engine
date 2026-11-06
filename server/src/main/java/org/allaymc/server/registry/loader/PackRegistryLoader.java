@@ -12,6 +12,7 @@ import org.allaymc.api.registry.RegistryLoader;
 import org.allaymc.server.AllayServer;
 import org.allaymc.server.pack.PackEncryptor;
 import org.allaymc.server.pack.PackUtils;
+import org.allaymc.server.pack.PackSubpackSelection;
 import org.allaymc.server.pack.defaults.BehaviorPack;
 import org.allaymc.server.pack.defaults.ResourcePack;
 import org.allaymc.server.pack.loader.InPluginPackLoader;
@@ -102,6 +103,14 @@ public class PackRegistryLoader implements RegistryLoader<Void, Map<UUID, Pack>>
             var pack = factory.create(loader, manifest);
             packs.put(uuid, pack);
 
+            var selected = AllayServer.getSettings().resourcePackSettings()
+                    .selectedSubpacks().get(uuid.toString());
+            if (selected != null && !selected.isBlank()
+                    && !selected.equals(PackSubpackSelection.resolve(manifest, selected))) {
+                log.warn("Invalid selected subpack '{}' for pack {} ({}); using pack default",
+                        selected, pack.getName(), uuid);
+            }
+
             log.info(I18n.get().tr(TrKeys.ALLAY_PACK_LOADED_ENTRY, pack.getName()));
         });
         log.info(I18n.get().tr(TrKeys.ALLAY_PACK_LOADED, packs.size()));
@@ -145,11 +154,18 @@ public class PackRegistryLoader implements RegistryLoader<Void, Map<UUID, Pack>>
                 try {
                     Files.move(zipPack, tmpPath);
                     key = PackEncryptor.encrypt(tmpPath, zipPack);
+                    Files.writeString(keyPath, key);
+                } catch (Exception exception) {
+                    // A failed encryption must never destroy the original pack.
+                    // Keep the backup and restore the original .mcpack/.zip.
+                    if (Files.exists(tmpPath)) {
+                        Files.move(tmpPath, zipPack, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                    Files.deleteIfExists(keyPath);
+                    throw exception;
                 } finally {
-                    Files.delete(tmpPath);
+                    Files.deleteIfExists(tmpPath);
                 }
-
-                Files.writeString(keyPath, key);
                 log.info(I18n.get().tr(TrKeys.ALLAY_PACK_ENCRYPTED, zipPack.getFileName(), key));
             }
         }
