@@ -186,9 +186,14 @@ public final class PackEncryptor {
     }
 
     private static ZipEntry copyZipEntry(ZipEntry entry) {
-        var newEntry = new ZipEntry(entry);
-        // Explicitly set method to DEFLATED to avoid invalid crc-32 error
+        // Do not copy CRC, compressed size, or other precomputed metadata
+        // from the unencrypted input: encrypted bytes have different CRCs
+        // and compression ratios, so ZipOutputStream must recalculate them.
+        var newEntry = new ZipEntry(entry.getName());
         newEntry.setMethod(ZipEntry.DEFLATED);
+        if (entry.getTime() >= 0) {
+            newEntry.setTime(entry.getTime());
+        }
         return newEntry;
     }
 
