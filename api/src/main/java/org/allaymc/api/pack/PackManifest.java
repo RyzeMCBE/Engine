@@ -36,7 +36,6 @@ public class PackManifest {
     }
 
     @SerializedName("format_version")
-    @SerializedName("format_version")
     private String formatVersion;
 
     private Header header;
