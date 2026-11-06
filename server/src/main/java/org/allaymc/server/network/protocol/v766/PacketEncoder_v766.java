@@ -59,6 +59,7 @@ import org.allaymc.server.container.ContainerNetworkInfo;
 import org.allaymc.server.container.impl.UnopenedContainerId;
 import org.allaymc.server.container.processor.ContainerActionProcessor;
 import org.allaymc.server.network.NetworkHelper;
+import org.allaymc.server.pack.AutomaticSubpackSelector;
 import org.allaymc.server.network.protocol.PacketEncoder;
 import org.allaymc.server.network.protocol.ProtocolData;
 import org.allaymc.server.player.ChunkCache;
@@ -271,16 +272,18 @@ public class PacketEncoder_v766 extends PacketEncoder {
     public ResourcePackStackPacket encodeResourcePackStack() {
         var settings = AllayServer.getSettings().resourcePackSettings();
         var packet = new ResourcePackStackPacket();
-        packet.setForcedToAccept(settings.forceResourcePacks() && !settings.allowClientResourcePacks());
+        // Requiring the server's packs is independent of whether the player
+        // may also use their own local resource packs.
+        packet.setForcedToAccept(settings.forceResourcePacks());
         packet.setGameVersion("*");
         packet.getExperiments().addAll(createExperiments());
 
         for (var pack : Registries.PACKS.getContent().values()) {
             switch (pack.getType()) {
                 case RESOURCES -> packet.getResourcePacks().add(new ResourcePackStackPacket.Entry(
-                        pack.getId().toString(), pack.getStringVersion(), ""));
+                        pack.getId().toString(), pack.getStringVersion(), AutomaticSubpackSelector.select(pack.getManifest())));
                 case DATA -> packet.getBehaviorPacks().add(new ResourcePackStackPacket.Entry(
-                        pack.getId().toString(), pack.getStringVersion(), ""));
+                        pack.getId().toString(), pack.getStringVersion(), AutomaticSubpackSelector.select(pack.getManifest())));
                 case WORLD_TEMPLATE, SCRIPT -> {
                 }
             }
@@ -2649,7 +2652,7 @@ packet.setAction(action);
                 pack.getStringVersion(),
                 pack.getSize(),
                 pack.getContentKey(),
-                "",
+                AutomaticSubpackSelector.select(pack.getManifest()),
                 pack.getId().toString(),
                 scripting,
                 pack.getManifest().getCapabilities().contains(PackManifest.Capability.RAYTRACED),

@@ -19,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TreeSet;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -45,7 +46,7 @@ public final class PackEncryptor {
         try (var inputZip = new ZipFile(inputPath.toString())) {
             encrypt0(inputZip, outputPath, key);
         } catch (Exception e) {
-            log.error("Failed to encrypt pack", e);
+            throw new ResourcePackException("Failed to encrypt " + inputPath, e);
         }
         return key;
     }
@@ -54,7 +55,7 @@ public final class PackEncryptor {
         try (var inputZip = new ZipFile(inputPath.toString())) {
             encrypt0(inputZip, outputPath, key);
         } catch (Exception e) {
-            log.error("Failed to encrypt pack", e);
+            throw new ResourcePackException("Failed to encrypt " + inputPath, e);
         }
     }
 
@@ -64,44 +65,42 @@ public final class PackEncryptor {
             throw new IllegalArgumentException("key length must be 32");
         }
 
-        // Find content id
         var uuid = findPackUUID(inputZip);
-
         var contentEntries = new ArrayList<ContentEntry>();
 
-        // Delete old output
-        Files.deleteIfExists(outputPath);
-        var outputStream = new ZipOutputStream(new FileOutputStream(outputPath.toFile()), StandardCharsets.UTF_8);
-        // Encrypt files
-        inputZip.stream().forEach(zipEntry -> {
-            if (zipEntry.isDirectory()) {
-                createDirectoryRoot(zipEntry, outputStream);
-                if (isSubPackRoot(zipEntry)) {
-                    // Handle sub pack
-                    encryptSubPack(inputZip, outputStream, zipEntry.getName(), key, uuid);
-                }
-
-                return;
-            }
-            // Sub pack files will be handled in encryptSubPack()
-            if (isSubPackFile(zipEntry)) {
-                return;
-            }
-
-            String entryKey = null;
-            // Check if file is excluded
-            if (EXCLUDED_FILES.contains(zipEntry.getName())) {
-                encryptExcludedFile(inputZip, outputStream, zipEntry);
-                // Excluded file does not have entry key
-            } else {
-                // Encrypt file
-                entryKey = encryptFile(inputZip, outputStream, zipEntry);
-            }
-            contentEntries.add(new ContentEntry(zipEntry.getName(), entryKey));
+        // Many valid .mcpack archives omit ZIP directory entries. Derive the
+        // subpack roots from file paths instead of relying on directory entries.
+        var subPackPaths = new TreeSet<String>();
+        inputZip.stream().map(ZipEntry::getName).forEach(name -> {
+            if (!name.startsWith("subpacks/")) return;
+            int start = "subpacks/".length();
+            int end = name.indexOf('/', start);
+            if (end > start) subPackPaths.add(name.substring(0, end + 1));
         });
 
-        generateContentsJson("contents.json", outputStream, uuid, key, contentEntries);
-        outputStream.close();
+        Files.deleteIfExists(outputPath);
+        try (var outputStream = new ZipOutputStream(new FileOutputStream(outputPath.toFile()), StandardCharsets.UTF_8)) {
+            inputZip.stream().forEach(zipEntry -> {
+                if (zipEntry.isDirectory()) {
+                    createDirectoryRoot(zipEntry, outputStream);
+                    return;
+                }
+                // The subpack contents.json files are written separately.
+                if (isSubPackFile(zipEntry)) return;
+
+                String entryKey = null;
+                if (EXCLUDED_FILES.contains(zipEntry.getName())) {
+                    encryptExcludedFile(inputZip, outputStream, zipEntry);
+                } else {
+                    entryKey = encryptFile(inputZip, outputStream, zipEntry);
+                }
+                contentEntries.add(new ContentEntry(zipEntry.getName(), entryKey));
+            });
+            for (var subPackPath : subPackPaths) {
+                encryptSubPack(inputZip, outputStream, subPackPath, key, uuid);
+            }
+            generateContentsJson("contents.json", outputStream, uuid, key, contentEntries);
+        }
     }
 
     @SneakyThrows
@@ -175,20 +174,6 @@ public final class PackEncryptor {
         return zipEntry.getName().startsWith("subpacks/");
     }
 
-    private static boolean isSubPackRoot(ZipEntry zipEntry) {
-        return zipEntry.isDirectory() && zipEntry.getName().startsWith("subpacks/") && calculateCharCount(zipEntry.getName(), '/') == 2;
-    }
-
-    private static int calculateCharCount(String str, char target) {
-        int count = 0;
-        for (char c : str.toCharArray()) {
-            if (c == target) {
-                count++;
-            }
-        }
-        return count;
-    }
-
     private static void paddingTo(ByteArrayOutputStream stream, int pos) {
         if (pos <= stream.size()) {
             throw new IllegalArgumentException("pos must be bigger than stream size");
@@ -201,9 +186,14 @@ public final class PackEncryptor {
     }
 
     private static ZipEntry copyZipEntry(ZipEntry entry) {
-        var newEntry = new ZipEntry(entry);
-        // Explicitly set method to DEFLATED to avoid invalid crc-32 error
+        // Do not copy CRC, compressed size, or other precomputed metadata
+        // from the unencrypted input: encrypted bytes have different CRCs
+        // and compression ratios, so ZipOutputStream must recalculate them.
+        var newEntry = new ZipEntry(entry.getName());
         newEntry.setMethod(ZipEntry.DEFLATED);
+        if (entry.getTime() >= 0) {
+            newEntry.setTime(entry.getTime());
+        }
         return newEntry;
     }
 
