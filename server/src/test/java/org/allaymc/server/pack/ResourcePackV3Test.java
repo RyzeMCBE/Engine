@@ -99,6 +99,24 @@ class ResourcePackV3Test {
     }
 
     @Test
+    void loadsOrdinaryZipPackWithV3Manifest(@TempDir Path directory) throws Exception {
+        var zipPath = directory.resolve("server-textures.zip");
+        try (var zip = new ZipOutputStream(Files.newOutputStream(zipPath))) {
+            entry(zip, "manifest.json", MANIFEST.getBytes(StandardCharsets.UTF_8));
+            entry(zip, "subpacks/SP2/textures/example.txt", new byte[]{1, 2, 3});
+        }
+        assertTrue(org.allaymc.server.pack.loader.ZipPackLoader.FACTORY.canLoad(zipPath));
+        try (var loader = org.allaymc.server.pack.loader.ZipPackLoader.FACTORY.create(zipPath)) {
+            var manifest = PackManifest.load(loader);
+            assertNotNull(manifest);
+            assertTrue(manifest.isValid());
+            assertEquals("1.26.40", manifest.getHeader().getMinEngineVersion().getVersion());
+            assertTrue(manifest.getCapabilities().contains(PackManifest.Capability.PBR));
+            assertEquals("SP2", manifest.getSubpacks().get(1).getFolderName());
+        }
+    }
+
+    @Test
     void encryptsSubpacksWithoutZipDirectoryEntries(@TempDir Path directory) throws Exception {
         var input = directory.resolve("synthetic.mcpack");
         var output = directory.resolve("encrypted.mcpack");
