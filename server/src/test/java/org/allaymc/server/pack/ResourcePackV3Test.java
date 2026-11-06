@@ -46,12 +46,28 @@ class ResourcePackV3Test {
         var manifest = PackManifest.fromJson(new StringReader(MANIFEST));
         assertTrue(manifest.isValid());
         assertEquals("3", manifest.getFormatVersion());
-        assertEquals("1.26.40", manifest.getHeader().getMinEngineVersion());
+        assertEquals("1.26.40", manifest.getHeader().getMinEngineVersion().getVersion());
         assertTrue(manifest.getCapabilities().contains(PackManifest.Capability.PBR));
         assertTrue(manifest.getCapabilities().contains(PackManifest.Capability.UNKNOWN));
         assertEquals("SP2", manifest.getSubpacks().get(1).getFolderName());
         assertEquals(1, manifest.getSubpacks().get(1).getMemoryPerformanceTier());
         assertEquals(1, manifest.getSettings().size());
+    }
+
+    @Test
+    void supportsLegacyArrayMinimumVersion() {
+        var json = com.google.gson.JsonParser.parseString(MANIFEST).getAsJsonObject();
+        var header = json.getAsJsonObject("header");
+        var minimum = new com.google.gson.JsonArray();
+        minimum.add(1);
+        minimum.add(26);
+        minimum.add(40);
+        header.add("min_engine_version", minimum);
+        var manifest = PackManifest.fromJson(new StringReader(json.toString()));
+        assertTrue(manifest.isValid());
+        assertEquals("1.26.40", manifest.getHeader().getMinEngineVersion().getVersion());
+        assertFalse(PackCompatibility.supports(manifest, "1.26.30"));
+        assertTrue(PackCompatibility.supports(manifest, "1.26.60"));
     }
 
     @Test
