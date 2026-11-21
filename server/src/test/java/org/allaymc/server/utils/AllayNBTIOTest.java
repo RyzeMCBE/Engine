@@ -2,6 +2,7 @@ package org.allaymc.server.utils;
 
 import org.allaymc.api.block.type.BlockTypes;
 import org.allaymc.api.block.property.enums.MinecraftVerticalHalf;
+import org.allaymc.api.block.property.enums.PillarAxis;
 import org.allaymc.api.block.property.type.BlockPropertyTypes;
 import org.allaymc.api.blockentity.BlockEntityInitInfo;
 import org.allaymc.api.blockentity.type.BlockEntityTypes;
@@ -19,9 +20,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import java.util.List;
 
 import org.cloudburstmc.nbt.NbtMap;
+import org.cloudburstmc.nbt.NbtType;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -162,6 +165,79 @@ class AllayNBTIOTest {
                 .putInt("version", ProtocolInfo.BLOCK_STATE_VERSION_NUM + 1)
                 .build();
         assertEquals(BlockTypes.UNKNOWN.getDefaultState(), NBTIO.getAPI().fromBlockStateNBT(nbt));
+    }
+
+    @Test
+    void testImportedLegacyLogAxesResolveWithoutLosingOrientation() {
+        var axes = new PillarAxis[]{PillarAxis.Y, PillarAxis.X, PillarAxis.Z};
+        for (int direction = 0; direction < 3; direction++) {
+            var imported = NbtMap.builder()
+                    .putString("name", "minecraft:log")
+                    .putCompound("states", NbtMap.builder()
+                            .putString("old_log_type", "oak")
+                            .putString("direction", String.valueOf(direction)).build())
+                    // Imported palettes may contain a modern version with a legacy ID.
+                    .putInt("version", ProtocolInfo.BLOCK_STATE_VERSION_NUM)
+                    .build();
+            var expected = BlockTypes.OAK_LOG.getDefaultState()
+                    .setPropertyValue(BlockPropertyTypes.PILLAR_AXIS, axes[direction]);
+            assertEquals(expected, NBTIO.getAPI().fromBlockStateNBT(imported));
+        }
+
+        var newerMixedState = NbtMap.builder()
+                .putString("name", "minecraft:oak_log")
+                .putCompound("states", NbtMap.builder().putInt("direction", 1).build())
+                .putInt("version", ProtocolInfo.BLOCK_STATE_VERSION_NUM + 1)
+                .build();
+        assertEquals(BlockTypes.OAK_LOG.getDefaultState()
+                        .setPropertyValue(BlockPropertyTypes.PILLAR_AXIS, PillarAxis.X),
+                NBTIO.getAPI().fromBlockStateNBT(newerMixedState));
+
+        var oldBark = NbtMap.builder()
+                .putString("name", "minecraft:oak_log")
+                .putCompound("states", NbtMap.builder().putInt("direction", 3).build())
+                .putInt("version", ProtocolInfo.BLOCK_STATE_VERSION_NUM)
+                .build();
+        assertEquals(BlockTypes.OAK_WOOD.getDefaultState(), NBTIO.getAPI().fromBlockStateNBT(oldBark));
+
+        var invalid = NbtMap.builder()
+                .putString("name", "minecraft:oak_log")
+                .putCompound("states", NbtMap.builder().putInt("direction", 9).build())
+                .putInt("version", ProtocolInfo.BLOCK_STATE_VERSION_NUM)
+                .build();
+        assertEquals(BlockTypes.UNKNOWN.getDefaultState(), NBTIO.getAPI().fromBlockStateNBT(invalid));
+    }
+
+    @Test
+    void testLegacyBedrockEntityDefinitionsRecoverOnlyUnambiguousVanillaTypes() {
+        var dimension = Server.getInstance().getWorldPool().getGlobalSpawnPoint().dimension();
+        var sheep = EntityTypes.SHEEP.createEntity(
+                EntityInitInfo.builder()
+                        .loc(Server.getInstance().getWorldPool().getGlobalSpawnPoint())
+                        .build());
+        var saved = sheep.saveNBT();
+
+        var legacy = saved.toBuilder()
+                .remove("identifier")
+                .putList("definitions", NbtType.STRING,
+                        List.of("+minecraft:sheep", "+minecraft:sheep_adult"))
+                .build();
+        var recovered = NBTIO.getAPI().fromEntityNBT(dimension, legacy);
+        assertNotNull(recovered);
+        assertEquals(EntityTypes.SHEEP, recovered.getEntityType());
+        assertEquals("minecraft:sheep", recovered.saveNBT().getString("identifier"));
+
+        var ambiguous = legacy.toBuilder().putList("definitions", NbtType.STRING,
+                List.of("+minecraft:sheep", "+minecraft:cow")).build();
+        assertNull(NBTIO.getAPI().fromEntityNBT(dimension, ambiguous));
+
+        var unknown = legacy.toBuilder().putList("definitions", NbtType.STRING,
+                List.of("+minecraft:unregistered_test")).build();
+        assertNull(NBTIO.getAPI().fromEntityNBT(dimension, unknown));
+
+        // A non-empty custom identifier must never be silently remapped to sheep.
+        var explicitCustom = legacy.toBuilder().putString("identifier", "custom:missing").build();
+        assertNull(NBTIO.getAPI().fromEntityNBT(dimension, explicitCustom));
     }
 
     @Test
