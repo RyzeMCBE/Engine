@@ -82,7 +82,7 @@ public class PackRegistryLoader implements RegistryLoader<Void, Map<UUID, Pack>>
         Map<PackLoader, PackManifest> loader2manifest = new HashMap<>();
         for (var loader : foundedLoaders) {
             var manifest = PackManifestCompatibility.load(loader);
-            if (manifest == null || !manifest.isValid()) {
+            if (!PackManifestCompatibility.isValid(manifest)) {
                 continue;
             }
 
