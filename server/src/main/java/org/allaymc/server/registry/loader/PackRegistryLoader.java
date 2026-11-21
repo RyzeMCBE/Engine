@@ -12,6 +12,7 @@ import org.allaymc.api.registry.RegistryLoader;
 import org.allaymc.server.AllayServer;
 import org.allaymc.server.pack.PackEncryptor;
 import org.allaymc.server.pack.PackUtils;
+import org.allaymc.server.pack.PackManifestCompatibility;
 import org.allaymc.server.pack.AutomaticSubpackSelector;
 import org.allaymc.server.pack.defaults.BehaviorPack;
 import org.allaymc.server.pack.defaults.ResourcePack;
@@ -80,7 +81,7 @@ public class PackRegistryLoader implements RegistryLoader<Void, Map<UUID, Pack>>
         // Load manifests
         Map<PackLoader, PackManifest> loader2manifest = new HashMap<>();
         for (var loader : foundedLoaders) {
-            var manifest = PackManifest.load(loader);
+            var manifest = PackManifestCompatibility.load(loader);
             if (manifest == null || !manifest.isValid()) {
                 continue;
             }
