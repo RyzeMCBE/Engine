@@ -217,9 +217,9 @@ class AllayNBTIOTest {
                         .build());
         var saved = sheep.saveNBT();
 
-        var legacy = saved.toBuilder()
-                .remove("identifier")
-                .putList("definitions", NbtType.STRING,
+        var legacyBuilder = saved.toBuilder();
+        legacyBuilder.remove("identifier");
+        var legacy = legacyBuilder.putList("definitions", NbtType.STRING,
                         List.of("+minecraft:sheep", "+minecraft:sheep_adult"))
                 .build();
         var recovered = NBTIO.getAPI().fromEntityNBT(dimension, legacy);
