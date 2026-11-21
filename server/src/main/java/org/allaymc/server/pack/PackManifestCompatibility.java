@@ -26,6 +26,21 @@ public final class PackManifestCompatibility {
     private PackManifestCompatibility() {
     }
 
+    /**
+     * Enforce the same structural validation under both the current source
+     * API and the older published Maven Central API. The latter may consider
+     * manifests with empty modules valid, even though the registry requires
+     * a first module to determine the pack type.
+     */
+    public static boolean isValid(PackManifest manifest) {
+        return manifest != null
+                && manifest.isValid()
+                && manifest.getModules() != null
+                && !manifest.getModules().isEmpty()
+                && manifest.getModules().getFirst() != null
+                && manifest.getModules().getFirst().getType() != null;
+    }
+
     public static PackManifest load(PackLoader loader) {
         if (loader == null || !loader.hasFile(PackManifest.FILE_NAME)) {
             return null;
