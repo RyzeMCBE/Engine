@@ -103,7 +103,7 @@ public class PackRegistryLoader implements RegistryLoader<Void, Map<UUID, Pack>>
             var pack = factory.create(loader, manifest);
             packs.put(uuid, pack);
 
-            var automaticallySelectedSubpack = AutomaticSubpackSelector.select(manifest);
+            var automaticallySelectedSubpack = AutomaticSubpackSelector.select(pack);
             if (!automaticallySelectedSubpack.isEmpty()) {
                 log.info("Pack {} automatically selects baseline subpack {} (no per-pack configuration)",
                         pack.getName(), automaticallySelectedSubpack);
