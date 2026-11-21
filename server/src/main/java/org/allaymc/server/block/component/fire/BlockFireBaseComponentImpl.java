@@ -40,6 +40,12 @@ public class BlockFireBaseComponentImpl extends BlockBaseComponentImpl implement
 
     protected static final int FIRE_SCHEDULED_UPDATE_DELAY = 30;
 
+    // FIRE has age and five connection properties. Starting from the full
+    // default state avoids a null palette lookup for an age-only state.
+    static BlockState fireStateWithAge(int age) {
+        return BlockTypes.FIRE.getDefaultState().setPropertyValue(AGE_16, age);
+    }
+
     public BlockFireBaseComponentImpl(BlockType<? extends BlockBehavior> blockType) {
         super(blockType);
     }
@@ -303,8 +309,7 @@ public class BlockFireBaseComponentImpl extends BlockBaseComponentImpl implement
                         var localBlock = new Block(localBlockState, new Position3i(lx, ly, lz, dimension), 0);
                         var event = new BlockIgniteEvent(localBlock, source, null, BlockIgniteEvent.BlockIgniteCause.SPREAD);
 
-                        if (event.call()) {
-                            dimension.setBlockState(lx, ly, lz, BlockTypes.FIRE.ofState(AGE_16.createValue(newAge)));
+                        if (event.call() && dimension.setBlockState(lx, ly, lz, fireStateWithAge(newAge))) {
                             dimension.getBlockUpdateManager().scheduleRandomBlockUpdateInDelay(new Vector3i(lx, ly, lz), FIRE_SCHEDULED_UPDATE_DELAY);
                         }
                     }
@@ -322,8 +327,7 @@ public class BlockFireBaseComponentImpl extends BlockBaseComponentImpl implement
                 var currentFireAge = Math.min(sourceFireAge + random.nextInt(5) / 4, AGE_16.getMax());
 
                 var event = new BlockIgniteEvent(target, source, null, BlockIgniteEvent.BlockIgniteCause.SPREAD);
-                if (event.call()) {
-                    dimension.setBlockState(target.getPosition(), BlockTypes.FIRE.ofState(AGE_16.createValue(currentFireAge)));
+                if (event.call() && dimension.setBlockState(target.getPosition(), fireStateWithAge(currentFireAge))) {
                     dimension.getBlockUpdateManager().scheduleRandomBlockUpdateInDelay(target.getPosition(), FIRE_SCHEDULED_UPDATE_DELAY);
                 }
             } else {
