@@ -226,11 +226,11 @@ public class DoubleChestContainerImpl implements BlockContainer {
     }
 
     protected void onOpen(ContainerViewer viewer) {
-        openListeners.forEach(listener -> listener.accept(viewer));
+        new ArrayList<>(openListeners).forEach(listener -> listener.accept(viewer));
     }
 
     protected void onClose(ContainerViewer viewer) {
-        closeListeners.forEach(listener -> listener.accept(viewer));
+        new ArrayList<>(closeListeners).forEach(listener -> listener.accept(viewer));
     }
 
     @Override
