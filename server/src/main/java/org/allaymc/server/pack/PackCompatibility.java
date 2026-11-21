@@ -1,7 +1,6 @@
 package org.allaymc.server.pack;
 
 import org.allaymc.api.pack.Pack;
-import org.allaymc.api.pack.PackManifest;
 
 import java.util.regex.Pattern;
 
@@ -19,14 +18,14 @@ public final class PackCompatibility {
     }
 
     public static boolean supports(Pack pack, String minecraftVersion) {
-        return pack != null && supports(pack.getManifest(), minecraftVersion);
+        return pack != null && supports(PackManifestMetadata.forPack(pack), minecraftVersion);
     }
 
-    public static boolean supports(PackManifest manifest, String minecraftVersion) {
-        if (manifest == null || manifest.getHeader() == null) return false;
-        var minimum = manifest.getHeader().getMinEngineVersion();
+    static boolean supports(PackManifestMetadata.Metadata metadata, String minecraftVersion) {
+        if (metadata == null || !metadata.valid()) return false;
+        var minimum = metadata.minimumClientVersion();
         if (minimum == null) return true;
-        return isAtLeast(minecraftVersion, minimum.getVersion());
+        return isAtLeast(minecraftVersion, minimum);
     }
 
     public static boolean isAtLeast(String client, String minimum) {

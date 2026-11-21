@@ -281,9 +281,9 @@ public class PacketEncoder_v766 extends PacketEncoder {
         for (var pack : Registries.PACKS.getContent().values()) {
             switch (pack.getType()) {
                 case RESOURCES -> packet.getResourcePacks().add(new ResourcePackStackPacket.Entry(
-                        pack.getId().toString(), pack.getStringVersion(), AutomaticSubpackSelector.select(pack.getManifest())));
+                        pack.getId().toString(), pack.getStringVersion(), AutomaticSubpackSelector.select(pack)));
                 case DATA -> packet.getBehaviorPacks().add(new ResourcePackStackPacket.Entry(
-                        pack.getId().toString(), pack.getStringVersion(), AutomaticSubpackSelector.select(pack.getManifest())));
+                        pack.getId().toString(), pack.getStringVersion(), AutomaticSubpackSelector.select(pack)));
                 case WORLD_TEMPLATE, SCRIPT -> {
                 }
             }
@@ -2652,7 +2652,7 @@ packet.setAction(action);
                 pack.getStringVersion(),
                 pack.getSize(),
                 pack.getContentKey(),
-                AutomaticSubpackSelector.select(pack.getManifest()),
+                AutomaticSubpackSelector.select(pack),
                 pack.getId().toString(),
                 scripting,
                 pack.getManifest().getCapabilities().contains(PackManifest.Capability.RAYTRACED),

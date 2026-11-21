@@ -205,7 +205,7 @@ public final class PackEncryptor {
         }
 
         try (var reader = new InputStreamReader(zip.getInputStream(manifestEntry), StandardCharsets.UTF_8)) {
-            var manifest = PackManifest.fromJson(reader);
+            var manifest = PackManifestCompatibility.fromJson(reader);
             return manifest.getHeader().getUuid().toString();
         }
     }
