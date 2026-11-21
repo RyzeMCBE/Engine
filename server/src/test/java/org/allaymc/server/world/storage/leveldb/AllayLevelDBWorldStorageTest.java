@@ -1,6 +1,7 @@
 package org.allaymc.server.world.storage.leveldb;
 
 import lombok.SneakyThrows;
+import org.allaymc.api.entity.Entity;
 import org.allaymc.api.world.World;
 import org.allaymc.api.world.biome.BiomeTypes;
 import org.allaymc.api.world.chunk.Chunk;
@@ -8,7 +9,10 @@ import org.allaymc.api.world.data.Difficulty;
 import org.allaymc.api.world.dimension.DimensionTypes;
 import org.allaymc.server.world.AllayWorldData;
 import org.allaymc.server.world.chunk.AllayUnsafeChunk;
+import org.allaymc.server.world.storage.leveldb.data.LevelDBKey;
 import org.allaymc.testutils.AllayTestExtension;
+import org.cloudburstmc.nbt.NbtMap;
+import org.iq80.leveldb.DB;
 import org.joml.Vector3i;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,11 +26,13 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletionException;
 
 import static org.allaymc.api.block.type.BlockTypes.OAK_WOOD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -119,6 +125,25 @@ class AllayLevelDBWorldStorageTest {
         assertEquals(BiomeTypes.FOREST, chunk.getBiome(0, 55, 0));
         assertEquals(319, chunk.getHeight(0, 0));
     }
+    @Test
+    @SneakyThrows
+    void asyncEntityWriteCommitsBeforeCompletingFuture() {
+        // Regression: the worker must commit the WriteBatch before it is closed.
+        long entityId = 987654321L;
+        var entity = Mockito.mock(Entity.class);
+        Mockito.when(entity.saveNBT()).thenReturn(NbtMap.builder()
+                .putString("identifier", "minecraft:pig")
+                .build());
+
+        levelDBWorldStorage.writeEntities(3, 4, DimensionTypes.OVERWORLD, Map.of(entityId, entity)).join();
+
+        var dbField = AllayLevelDBWorldStorage.class.getDeclaredField("db");
+        dbField.setAccessible(true);
+        var db = (DB) dbField.get(levelDBWorldStorage);
+        assertNotNull(db.get(LevelDBKey.createEntityIdsKey(3, 4, DimensionTypes.OVERWORLD)));
+        assertNotNull(db.get(LevelDBKey.indexEntity(entityId)));
+    }
+
     @Test
     void asyncChunkWriteFailurePropagatesToCaller() {
         var failingStorage = new AllayLevelDBWorldStorage(tempDir.resolve("failingworld")) {
