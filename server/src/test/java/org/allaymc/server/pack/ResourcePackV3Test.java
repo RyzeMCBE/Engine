@@ -129,7 +129,8 @@ class ResourcePackV3Test {
         // A malformed manifest must be rejected instead of crashing the loader.
         var json = com.google.gson.JsonParser.parseString(MANIFEST).getAsJsonObject();
         json.add("modules", new com.google.gson.JsonArray());
-        assertFalse(PackManifestCompatibility.fromJson(new StringReader(json.toString())).isValid());
+        assertFalse(PackManifestCompatibility.isValid(
+                PackManifestCompatibility.fromJson(new StringReader(json.toString()))));
     }
 
     @Test
