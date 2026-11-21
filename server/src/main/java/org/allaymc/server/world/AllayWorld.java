@@ -184,13 +184,18 @@ public class AllayWorld implements World {
     }
 
     protected void handleSyncPackets() {
-        try {
-            PacketQueueEntry entry;
-            int count = 0;
-            while (count < MAX_PACKETS_HANDLE_COUNT_AT_ONCE && (entry = packetQueue.poll()) != null) {
+        PacketQueueEntry entry;
+        int count = 0;
+        while (count < MAX_PACKETS_HANDLE_COUNT_AT_ONCE && (entry = packetQueue.poll()) != null) {
+            // Failed, stale and disconnected packets must count against the per-pass limit,
+            // otherwise a flood can monopolize this world's thread.
+            count++;
+            try {
                 // A queued packet belongs to the world that owned the player when it was received.
-                if (entry.player.getControlledEntity().getWorld() != this) {
-                    log.error("Trying to handle sync packet in world {} which the player {} is not in!", name, entry.player.getOriginName());
+                if (entry.player.getControlledEntity() == null
+                        || entry.player.getControlledEntity().getWorld() != this) {
+                    log.debug("Discarding stale sync packet for player {} in world {}",
+                            entry.player.getOriginName(), name);
                     continue;
                 }
 
@@ -200,10 +205,12 @@ public class AllayWorld implements World {
                 }
 
                 entry.processor().handleSync(entry.player(), entry.packet(), entry.time());
-                count++;
+            } catch (Throwable throwable) {
+                // One malformed or failing packet must not discard the rest of the batch.
+                log.error("Error while handling {} for player {} in world {}",
+                        entry.packet().getClass().getSimpleName(), entry.player.getOriginName(),
+                        this.getWorldData().getDisplayName(), throwable);
             }
-        } catch (Throwable throwable) {
-            log.error("Error while handling sync packet in world {}", this.getWorldData().getDisplayName(), throwable);
         }
     }
 
