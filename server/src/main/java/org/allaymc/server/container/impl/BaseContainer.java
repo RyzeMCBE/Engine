@@ -125,7 +125,7 @@ public class BaseContainer implements Container {
     @Override
     public void notifySlotChange(int slot, boolean send) {
         if (send) {
-            for (var viewer : viewers.values()) {
+            for (var viewer : List.copyOf(viewers.values())) {
                 viewer.viewContainerSlot(this, slot);
             }
         }
@@ -135,17 +135,21 @@ public class BaseContainer implements Container {
             return;
         }
 
-        for (var listener : listeners) {
+        for (var listener : List.copyOf(listeners)) {
             listener.accept(content[slot]);
         }
     }
 
     protected void onOpen(ContainerViewer viewer) {
-        openListeners.forEach(listener -> listener.accept(viewer));
+        for (var listener : List.copyOf(openListeners)) {
+            listener.accept(viewer);
+        }
     }
 
     protected void onClose(ContainerViewer viewer) {
-        closeListeners.forEach(listener -> listener.accept(viewer));
+        for (var listener : List.copyOf(closeListeners)) {
+            listener.accept(viewer);
+        }
     }
 
     @Override

@@ -244,6 +244,23 @@ class ContainerTest {
         }
 
         @Test
+        void closingListenerMayDetachItselfWithoutConcurrentModification() {
+            var calls = new AtomicInteger();
+            var own = new AtomicReference<Consumer<ContainerViewer>>();
+            own.set(v -> {
+                calls.incrementAndGet();
+                container.removeCloseListener(own.get());
+            });
+            container.addCloseListener(own.get());
+            container.addViewer(viewer);
+            assertDoesNotThrow(() -> container.removeViewer(viewer));
+            assertEquals(1, calls.get());
+            container.addViewer(viewer);
+            assertDoesNotThrow(() -> container.removeViewer(viewer));
+            assertEquals(1, calls.get());
+        }
+
+        @Test
         void testRemoveCloseListener() {
             AtomicInteger count = new AtomicInteger(0);
             Consumer<ContainerViewer> listener = v -> count.incrementAndGet();

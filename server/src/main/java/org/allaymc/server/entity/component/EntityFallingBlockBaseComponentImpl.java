@@ -2,6 +2,7 @@ package org.allaymc.server.entity.component;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.allaymc.api.block.component.BlockFallableComponent;
 import org.allaymc.api.block.data.BlockFace;
 import org.allaymc.api.block.data.BlockTags;
@@ -25,6 +26,7 @@ import org.joml.primitives.AABBdc;
  */
 @Getter
 @Setter
+@Slf4j
 public class EntityFallingBlockBaseComponentImpl extends EntityBaseComponentImpl implements EntityFallingBlockBaseComponent {
 
     @Dependency
@@ -43,7 +45,17 @@ public class EntityFallingBlockBaseComponentImpl extends EntityBaseComponentImpl
     }
 
     protected void tickFalling() {
-        if (this.willBeDespawnedLater() || physicsComponent.isOnGround()) {
+        if (this.willBeDespawnedLater()) {
+            return;
+        }
+        // Unknown/legacy NBT hashes can leave the state unresolved. A falling
+        // entity without a state cannot turn safely into a block or an item.
+        if (blockState == null) {
+            log.warn("Discarding falling block with missing block state at {}", getLocation());
+            thisEntity.remove();
+            return;
+        }
+        if (physicsComponent.isOnGround()) {
             // The falling block entity already became block
             return;
         }
@@ -62,9 +74,15 @@ public class EntityFallingBlockBaseComponentImpl extends EntityBaseComponentImpl
     @EventHandler
     protected void onFall(CEntityFallEvent event) {
         var dimension = getDimension();
+        // Capture the state before queuing the removal callback; it may run later.
+        final var landedState = blockState;
         // It is better to place the block when the Entity is removed, so that it looks visually normal.
         dimension.getEntityManager().removeEntity(thisEntity, () -> {
-            if (!(blockState.getBehavior() instanceof BlockFallableComponent fallableComponent)) {
+            if (landedState == null) {
+                log.warn("Discarded falling block with missing block state on landing at {}", getLocation());
+                return;
+            }
+            if (!(landedState.getBehavior() instanceof BlockFallableComponent fallableComponent)) {
                 return;
             }
 
@@ -81,17 +99,19 @@ public class EntityFallingBlockBaseComponentImpl extends EntityBaseComponentImpl
             if (!physicsComponent.getBlockStateStandingOn().getBlockStateData().collisionShape().isFull(BlockFace.UP)) {
                 // Falling on a block which is not full in upper face, for example torch.
                 // In this case, the falling block should be turned into item instead of block
-                dimension.dropItem(blockState.toItemStack(), location);
+                dimension.dropItem(landedState.toItemStack(), location);
             } else {
-                fallableComponent.onLanded(location, event.getFallDistance(), blockState);
+                fallableComponent.onLanded(location, event.getFallDistance(), landedState);
             }
         });
     }
 
     @Override
     public NbtMap saveNBT() {
-        return super.saveNBT()
-                .toBuilder()
+        // A malformed entity must not crash saving the other entities in its chunk.
+        // Its incomplete NBT will be safely discarded on the next load/tick.
+        final var nbt = super.saveNBT();
+        return blockState == null ? nbt : nbt.toBuilder()
                 .putInt("BlockStateHash", blockState.blockStateHash())
                 .build();
     }
@@ -99,9 +119,12 @@ public class EntityFallingBlockBaseComponentImpl extends EntityBaseComponentImpl
     @Override
     public void loadNBT(NbtMap nbt) {
         super.loadNBT(nbt);
-        nbt.listenForInt("BlockStateHash", blockStateHash ->
-                blockState = Registries.BLOCK_STATE_PALETTE.get(blockStateHash)
-        );
+        nbt.listenForInt("BlockStateHash", blockStateHash -> {
+            blockState = Registries.BLOCK_STATE_PALETTE.get(blockStateHash);
+            if (blockState == null) {
+                log.warn("Unrecognized falling block state hash {} at {}", blockStateHash, getLocation());
+            }
+        });
     }
 
     @Override

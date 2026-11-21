@@ -353,6 +353,28 @@ class GameLoopTest {
     }
 
     @Test
+    void idlePacketWorkAppearsInMeasuredTpsAndMspt() {
+        var stalled = new AtomicBoolean();
+        GameLoop gameLoop = GameLoop.builder()
+                .loopCountPerSec(20)
+                .onTick(loop -> {
+                    if (loop.getTick() >= 6) loop.stop();
+                })
+                .onIdle(() -> {
+                    if (stalled.compareAndSet(false, true)) {
+                        java.util.concurrent.locks.LockSupport.parkNanos(150_000_000L);
+                    }
+                })
+                .build();
+
+        gameLoop.startLoop();
+        assertTrue(stalled.get(), "the idle phase must have run");
+        assertTrue(gameLoop.getTPS() < 20f, "a stall between ticks must lower measured TPS");
+        assertTrue(gameLoop.getMaxTickIntervalMS() > 100f);
+        assertTrue(gameLoop.getPeakMSPT() > 100f, "onIdle work must be counted in MSPT");
+    }
+
+    @Test
     void testOnIdleNullByDefault() {
         // When onIdle is not set, loop should still work without NPE
         var tickCount = new AtomicInteger(0);

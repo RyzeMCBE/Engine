@@ -42,7 +42,7 @@ public final class GameLoop {
         // Sample window size = loopCountPerSec, so we always sample 1 second of data
         this.tickSummary = new float[loopCountPerSec];
         this.MSPTSummary = new float[loopCountPerSec];
-        Arrays.fill(tickSummary, loopCountPerSec);
+        Arrays.fill(tickSummary, 1000f / loopCountPerSec);
         Arrays.fill(MSPTSummary, 0f);
     }
 
@@ -54,13 +54,35 @@ public final class GameLoop {
         return getMSPT() / (1000f / loopCountPerSec);
     }
 
+    /**
+     * Measured wall-clock TPS. Each sample is the interval between two actual
+     * tick starts, including time spent processing network packets in onIdle.
+     * Averaging intervals (not their reciprocals) correctly reflects stalls.
+     */
     public float getTPS() {
-        float sum = 0;
-        int count = tickSummary.length;
-        for (float tick : tickSummary) {
-            sum += tick;
+        float sumMillis = 0;
+        for (float intervalMillis : tickSummary) {
+            sumMillis += intervalMillis;
         }
-        return sum / count;
+        return Math.min(loopCountPerSec, tickSummary.length * 1000f / Math.max(sumMillis, 0.001f));
+    }
+
+    /** Peak work time in the current one-second sample window. */
+    public float getPeakMSPT() {
+        float peak = 0;
+        for (float value : MSPTSummary) {
+            peak = Math.max(peak, value);
+        }
+        return peak;
+    }
+
+    /** Largest wall-clock gap between consecutive ticks in the sample window. */
+    public float getMaxTickIntervalMS() {
+        float peak = 0;
+        for (float value : tickSummary) {
+            peak = Math.max(peak, value);
+        }
+        return peak;
     }
 
     public float getMSPT() {
@@ -88,14 +110,22 @@ public final class GameLoop {
         onStart.run();
         long nanoSleepTime = 0;
         long idealNanoSleepPerTick = 1000000000 / loopCountPerSec;
+        long previousTickStart = -1;
+        long idleWorkNanos = 0;
         while (isRunning.get()) {
             // Figure out how long it took to tick
             long startTickTime = System.nanoTime();
+            long tickIntervalNanos = previousTickStart < 0
+                    ? idealNanoSleepPerTick : Math.max(1, startTickTime - previousTickStart);
+            previousTickStart = startTickTime;
             onTick.accept(this);
             tick++;
             long timeTakenToTick = System.nanoTime() - startTickTime;
-            updateMSPT(timeTakenToTick, MSPTSummary);
-            updateTPS(timeTakenToTick);
+            // Include the actual onIdle work accumulated since the previous tick.
+            // Do not include idle parking/sleep in MSPT; it is reflected by TPS.
+            updateMSPT(timeTakenToTick + idleWorkNanos, MSPTSummary);
+            idleWorkNanos = 0;
+            updateTPS(tickIntervalNanos);
 
             long sumOperateTime = System.nanoTime() - startTickTime;
             // Sleep for the ideal time but take into account the time spent running the tick
@@ -106,7 +136,12 @@ public final class GameLoop {
                 LockSupport.parkNanos(nanoSleepTime);
                 // Call onIdle callback when woken up (e.g., to process network packets)
                 if (onIdle != null && isRunning.get()) {
-                    onIdle.run();
+                    long idleStart = System.nanoTime();
+                    try {
+                        onIdle.run();
+                    } finally {
+                        idleWorkNanos += System.nanoTime() - idleStart;
+                    }
                 }
                 // Subtract total elapsed time (park + onIdle execution)
                 nanoSleepTime -= System.nanoTime() - sleepStart;
@@ -116,10 +151,9 @@ public final class GameLoop {
         onStop.run();
     }
 
-    private void updateTPS(long timeTakenToTick) {
-        float tick = Math.max(0, Math.min(loopCountPerSec, 1000000000f / (timeTakenToTick == 0 ? 1 : timeTakenToTick)));
+    private void updateTPS(long wallClockIntervalNanos) {
         System.arraycopy(tickSummary, 1, tickSummary, 0, tickSummary.length - 1);
-        tickSummary[tickSummary.length - 1] = tick;
+        tickSummary[tickSummary.length - 1] = wallClockIntervalNanos / 1000000f;
     }
 
     private void updateMSPT(float timeTakenToTick, float[] msptSummary) {
