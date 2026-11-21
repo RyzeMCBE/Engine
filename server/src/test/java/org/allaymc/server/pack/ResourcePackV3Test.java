@@ -43,7 +43,7 @@ class ResourcePackV3Test {
 
     @Test
     void parsesV3ManifestPbrSubpacksAndSettings() {
-        var manifest = PackManifest.fromJson(new StringReader(MANIFEST));
+        var manifest = PackManifestCompatibility.fromJson(new StringReader(MANIFEST));
         assertTrue(manifest.isValid());
         assertEquals("3", manifest.getFormatVersion());
         var metadata = metadata(MANIFEST);
@@ -129,7 +129,7 @@ class ResourcePackV3Test {
         // A malformed manifest must be rejected instead of crashing the loader.
         var json = com.google.gson.JsonParser.parseString(MANIFEST).getAsJsonObject();
         json.add("modules", new com.google.gson.JsonArray());
-        assertFalse(PackManifest.fromJson(new StringReader(json.toString())).isValid());
+        assertFalse(PackManifestCompatibility.fromJson(new StringReader(json.toString())).isValid());
     }
 
     @Test
@@ -141,7 +141,7 @@ class ResourcePackV3Test {
         }
         assertTrue(org.allaymc.server.pack.loader.ZipPackLoader.FACTORY.canLoad(zipPath));
         try (var loader = org.allaymc.server.pack.loader.ZipPackLoader.FACTORY.create(zipPath)) {
-            var manifest = PackManifest.load(loader);
+            var manifest = PackManifestCompatibility.load(loader);
             assertNotNull(manifest);
             assertTrue(manifest.isValid());
             var metadata = PackManifestMetadata.read(loader);
