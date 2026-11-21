@@ -6,7 +6,7 @@ import org.allaymc.api.entity.effect.EffectTypes;
 import org.allaymc.api.entity.interfaces.EntityLiving;
 import org.allaymc.api.eventbus.event.entity.EntityDieEvent;
 import org.allaymc.api.eventbus.event.entity.EntityHealthChangeEvent;
-import org.allaymc.api.math.location.Location3dc;
+import org.allaymc.api.math.location.Location3d;
 import org.allaymc.api.server.Server;
 import org.allaymc.api.world.gamerule.GameRule;
 import org.allaymc.server.component.ComponentManager;
@@ -132,7 +132,7 @@ class DeathHealthConsistencyTest {
             state.set(invocation.getArgument(0));
             return true;
         });
-        when(base.getLocation()).thenReturn(mock(Location3dc.class));
+        when(base.getLocation()).thenReturn(mock(Location3d.class));
         when(entity.getWorld().getWorldData().<Boolean>getGameRuleValue(GameRule.DO_MOB_LOOT))
                 .thenReturn(false);
 
