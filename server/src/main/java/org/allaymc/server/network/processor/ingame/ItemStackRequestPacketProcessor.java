@@ -7,6 +7,7 @@ import org.allaymc.api.player.Player;
 import org.allaymc.api.eventbus.event.player.PlayerInventoryRequestEvent;
 import org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.ItemStackRequestSlotData;
 import org.cloudburstmc.protocol.bedrock.data.inventory.itemstack.request.action.*;
+import org.allaymc.server.container.impl.FakeContainerImpl;
 import org.allaymc.server.container.processor.ActionResponse;
 import org.allaymc.server.container.processor.ContainerActionProcessor;
 import org.allaymc.server.container.processor.ContainerActionProcessorHolder;
@@ -151,8 +152,16 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
                         if (index > 0) transfer.rollback();
                         rejectedTransfers.add(transfer);
                     }
-                    log.warn("Item stack request id={} rejected by action[{}] type={} (player={})",
-                            request.requestId(), index, action.getType(), player.getOriginName());
+                    // Clicking a read-only fake menu is intentionally handled by its click listener.
+                    // It must still return ERROR to discard the client's predicted item movement;
+                    // this is not the same as a rejected real-inventory transaction.
+                    if (isExpectedFakeMenuClick(player, action)) {
+                        log.debug("Read-only fake-menu click handled: request={} action={} player={}",
+                                request.requestId(), action.getType(), player.getOriginName());
+                    } else {
+                        log.warn("Item stack request id={} rejected by action[{}] type={} (player={})",
+                                request.requestId(), index, action.getType(), player.getOriginName());
+                    }
                     continue label;
                 }
 
@@ -203,6 +212,30 @@ public class ItemStackRequestPacketProcessor extends PacketProcessor<ItemStackRe
                 log.warn("Failed to synchronize other inventory viewers for {}", player.getOriginName(), exception);
             }
         }
+    }
+
+    /**
+     * Classify ONLY valid slot references targeting an actual read-only fake container.
+     * Invalid indices, normal storage and editable virtual inventories still use
+     * the standard rejection path; they are never implicitly accepted.
+     */
+    static boolean isExpectedFakeMenuClick(Player player, ItemStackRequestAction action) {
+        if (!(action instanceof TransferItemStackRequestAction || action instanceof SwapAction)) {
+            return false;
+        }
+        boolean readOnlyFake = false;
+        try {
+            for (var slot : referencedSlots(action)) {
+                var container = ContainerActionProcessor.getContainerFrom(player, slot.containerName());
+                ContainerActionProcessor.fromNetworkSlotIndex(container, slot.slot());
+                if (container instanceof FakeContainerImpl fake && fake.isReadOnly()) {
+                    readOnlyFake = true;
+                }
+            }
+        } catch (RuntimeException invalidSlot) {
+            return false;
+        }
+        return readOnlyFake;
     }
 
     boolean allowRequest(Player player, ItemStackRequestAction[] actions) {
