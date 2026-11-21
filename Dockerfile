@@ -1,11 +1,9 @@
-# Build with Git submodules checked out: git clone --recurse-submodules ...
+# Engine resolves Protocol and StateUpdater from Maven Central during the build.
 FROM eclipse-temurin:21-jdk-jammy AS build
 RUN apt-get update && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY . .
-RUN test -f protocol-local/bedrock-codec/build.gradle.kts \
-    && test -f stateupdater-local/settings.gradle.kts
 RUN chmod +x gradlew && ./gradlew :server:shadowJar --no-daemon
 
 FROM eclipse-temurin:21-jre-jammy
