@@ -26,7 +26,7 @@ public class ContainerClosePacketProcessor extends PacketProcessor<ContainerClos
             if (opened != null) {
                 suppressCloseResponse = true;
             } else if (!player.getOpenedContainers().isEmpty()) {
-                for (var container : player.getOpenedContainers()) {
+                for (var container : java.util.List.copyOf(player.getOpenedContainers())) {
                     allayPlayer.setSuppressNextContainerClosePacket(true);
                     container.removeViewer(player);
                 }
