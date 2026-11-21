@@ -14,12 +14,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - name: Checkout
+      - name: Checkout (Maven Central dependencies)
         uses: actions/checkout@v7
-        with:
-          submodules: recursive
-      - name: Verificar dependencias enlazadas
-        run: bash .github/scripts/check-linked-dependencies.sh
       - name: Verify SDK publication rejects shaded variants and missing prerequisites
         run: python3 .github/scripts/test-central-server-publication.py
       - name: Set up Java 21

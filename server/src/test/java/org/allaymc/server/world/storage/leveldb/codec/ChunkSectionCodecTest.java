@@ -5,6 +5,7 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.Unpooled;
 import org.allaymc.api.block.property.type.BlockPropertyTypes;
 import org.allaymc.api.block.property.enums.MinecraftVerticalHalf;
+import org.allaymc.api.block.property.enums.PillarAxis;
 import org.allaymc.api.block.type.BlockTypes;
 import org.allaymc.api.world.biome.BiomeTypes;
 import org.allaymc.api.world.dimension.DimensionTypes;
@@ -57,6 +58,42 @@ class ChunkSectionCodecTest {
         assertEquals(OAK_WOOD.getDefaultState(), deserialized.getBlockState(0, 0, 0, 0));
         assertEquals(STONE.getDefaultState(), deserialized.getBlockState(1, 1, 1, 0));
         assertEquals(OAK_WOOD.getDefaultState(), deserialized.getBlockState(2, 2, 2, 1));
+    }
+
+    /**
+     * A LevelDB palette imported from an older Bedrock server may still contain
+     * minecraft:log and direction with a recent version tag. Decode the true
+     * orientation and ensure the next chunk save writes canonical oak_log NBT.
+     */
+    @Test
+    void testLegacyLogWithMixedVersionIsConvertedWhenChunkResaves() {
+        var legacyLog = NbtMap.builder()
+                .putString("name", "minecraft:log")
+                .putCompound("states", NbtMap.builder()
+                        .putString("old_log_type", "oak")
+                        .putString("direction", "x").build())
+                .putInt("version", ProtocolInfo.BLOCK_STATE_VERSION_NUM)
+                .build();
+        var palette = new Palette<>(AIR.getDefaultState().getBlockStateNBT());
+        palette.set(hashChunkSectionXYZ(1, 2, 3), legacyLog);
+        var layer1 = new Palette<>(AIR.getDefaultState().getBlockStateNBT());
+
+        var raw = LevelDBUtils.withByteBufToArray(buffer -> {
+            buffer.writeByte(AllayChunkSection.CURRENT_CHUNK_SECTION_VERSION);
+            buffer.writeByte(AllayChunkSection.LAYER_COUNT);
+            buffer.writeByte(0);
+            palette.writeToStorage(buffer, tag -> tag);
+            layer1.writeToStorage(buffer, tag -> tag);
+        });
+
+        var loaded = ChunkSectionCodec.deserialize(raw, 0, 0, 0);
+        assertNotNull(loaded);
+        var expected = BlockTypes.OAK_LOG.getDefaultState()
+                .setPropertyValue(BlockPropertyTypes.PILLAR_AXIS, PillarAxis.X);
+        assertEquals(expected, loaded.getBlockState(1, 2, 3, 0));
+
+        var rewritten = readRawLayer0(ChunkSectionCodec.serialize(loaded, 0));
+        assertEquals(expected.getBlockStateNBT(), rewritten.get(hashChunkSectionXYZ(1, 2, 3)));
     }
 
     /**

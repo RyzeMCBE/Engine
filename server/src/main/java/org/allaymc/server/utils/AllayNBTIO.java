@@ -50,9 +50,14 @@ public class AllayNBTIO implements NBTIO {
         // Older states must be migrated. Newer states are still worth resolving:
         // if their name/properties are already known, preserving compatibility is safe.
         var version = nbt.getInt("version", 0);
-        if (version < ProtocolInfo.BLOCK_STATE_VERSION_NUM) {
+        var storedName = nbt.getString("name");
+        // A legacy identifier is authoritative even when an imported palette
+        // carries a recent version tag. Modern, valid IDs keep their normal path.
+        if (version < ProtocolInfo.BLOCK_STATE_VERSION_NUM ||
+                storedName.equals("minecraft:log") || storedName.equals("minecraft:log2")) {
             nbt = BlockStateUpdaters.updateBlockState(nbt, ProtocolInfo.BLOCK_STATE_UPDATER.getVersion());
         }
+        nbt = normalizeImportedLogDirection(nbt);
 
         // Get the block type. Malformed or future identifiers are treated like unknown blocks.
         var name = nbt.getString("name");
@@ -136,11 +141,25 @@ public class AllayNBTIO implements NBTIO {
 
     @Override
     public Entity fromEntityNBT(Dimension dimension, NbtMap nbt) {
+        String storedIdentifier = nbt.getString("identifier");
+        // Bedrock LevelDB's legacy entity records often have an integer `id`
+        // and a definitions list but no string identifier at all.
+        // Recover only an unambiguous, registered vanilla entity.
+        if (storedIdentifier.isBlank() || storedIdentifier.equals("minecraft:")) {
+            var recovered = recoverLegacyEntityIdentifier(nbt);
+            if (recovered == null) {
+                log.warn("Entity has no usable identifier or unambiguous vanilla definition");
+                return null;
+            }
+            storedIdentifier = recovered.toString();
+            nbt = nbt.toBuilder().putString("identifier", storedIdentifier).build();
+        }
+
         final Identifier identifier;
         try {
-            identifier = new Identifier(nbt.getString("identifier"));
+            identifier = new Identifier(storedIdentifier);
         } catch (RuntimeException exception) {
-            log.warn("Malformed entity identifier {}", nbt.getString("identifier"));
+            log.warn("Malformed entity identifier {}", storedIdentifier);
             return null;
         }
 
@@ -151,6 +170,84 @@ public class AllayNBTIO implements NBTIO {
         }
 
         return entityType.createEntity(EntityInitInfo.builder().dimension(dimension).nbt(nbt).build());
+    }
+
+    /**
+     * Normalize old log axes in imported mixed-version palettes. This is also
+     * needed when Engine still uses a released StateUpdater predating the same
+     * compatibility fix. Never discard an unknown or conflicting orientation:
+     * ChunkSectionCodec must be able to preserve that state's original NBT.
+     */
+    private static NbtMap normalizeImportedLogDirection(NbtMap nbt) {
+        String name = nbt.getString("name");
+        if (!isOldDirectionalLog(name)) return nbt;
+        var states = nbt.getCompound("states");
+        Object direction = states.get("direction");
+        if (direction == null) return nbt;
+
+        String axis = null;
+        if (direction instanceof Number number) {
+            int value = number.intValue();
+            if (number.doubleValue() == value) {
+                axis = switch (value) {
+                    case 0, 3 -> "y";
+                    case 1 -> "x";
+                    case 2 -> "z";
+                    default -> null;
+                };
+            }
+        } else if (direction instanceof String value) {
+            axis = switch (value) {
+                case "0", "3", "y" -> "y";
+                case "1", "x" -> "x";
+                case "2", "z" -> "z";
+                default -> null;
+            };
+        }
+        if (axis == null) return nbt;
+
+        Object existingAxis = states.get("pillar_axis");
+        if (existingAxis != null && !axis.equals(existingAxis)) return nbt;
+
+        var updatedStates = states.toBuilder();
+        updatedStates.remove("direction");
+        updatedStates.putString("pillar_axis", axis);
+        boolean bark = direction instanceof Number number && number.doubleValue() == 3 ||
+                direction instanceof String value && value.equals("3");
+        if (bark && name.endsWith("_log")) {
+            name = name.substring(0, name.length() - "_log".length()) + "_wood";
+        }
+        return nbt.toBuilder().putString("name", name).putCompound("states", updatedStates.build()).build();
+    }
+
+    private static boolean isOldDirectionalLog(String name) {
+        if (!name.startsWith("minecraft:")) return false;
+        String path = name.substring("minecraft:".length());
+        if (path.startsWith("stripped_")) path = path.substring("stripped_".length());
+        if (!path.endsWith("_log") && !path.endsWith("_wood")) return false;
+        String wood = path.substring(0, path.lastIndexOf('_'));
+        return switch (wood) {
+            case "oak", "spruce", "birch", "jungle", "acacia", "dark_oak" -> true;
+            default -> false;
+        };
+    }
+
+    private static Identifier recoverLegacyEntityIdentifier(NbtMap nbt) {
+        if (!(nbt.get("definitions") instanceof java.util.List<?> definitions)) return null;
+        Identifier found = null;
+        for (Object entry : definitions) {
+            if (!(entry instanceof String definition) || !definition.startsWith("+minecraft:")) continue;
+            Identifier candidate;
+            try {
+                candidate = new Identifier(definition.substring(1));
+            } catch (RuntimeException exception) {
+                continue;
+            }
+            if (candidate.path().isEmpty() || Registries.ENTITIES.get(candidate) == null) continue;
+            if (found != null && !found.equals(candidate)) return null;
+            found = candidate;
+        }
+        return found;
     }
 
     /**

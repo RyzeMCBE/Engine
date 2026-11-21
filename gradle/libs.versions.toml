@@ -5,21 +5,21 @@ fastutil = "8.5.15"
 leveldb = "1.1.0"
 netty = "4.2.19.Final"
 # CloudburstMC Network NetherNet branch (same RakNet/NetherNet transport family)
-cloudburst-network = "2.0.0.CR6-20261026.130552-16"
-libdatachannel = "0.24.6.0-20261023.142230-9"
+cloudburst-network = "2.0.0.CR6-ryze.1"
+libdatachannel = "0.24.6.0-ryze.1"
 
 [libraries]
 # NBT
 nbt = { group = "org.allaymc", name = "nbt", version = "3.0.12" }
 # Protocol
-protocol = { group = "org.allaymc.protocol", name = "bedrock-connection", version = "1.26.60-R1-SNAPSHOT" }
+protocol = { group = "io.github.ryzemcbe", name = "bedrock-connection", version = "1.26.60-R1" }
 # Linux x86_64 NetherNet / WebRTC transport
-nethernet-transport = { group = "org.cloudburstmc.netty", name = "netty-transport-nethernet", version.ref = "cloudburst-network" }
-libdatachannel-native-linux = { group = "dev.opencollab", name = "libdatachannel-java", version.ref = "libdatachannel" }
+nethernet-transport = { group = "io.github.ryzemcbe", name = "ryze-netty-transport-nethernet", version.ref = "cloudburst-network" }
+libdatachannel-native-linux = { group = "io.github.ryzemcbe", name = "ryze-libdatachannel-java", version.ref = "libdatachannel" }
 # State Updater
-updater-common = { group = "org.allaymc.stateupdater", name = "common", version = "0.1.1" }
-item-updater = { group = "org.allaymc.stateupdater", name = "item-updater", version = "1.26.50-R1" }
-block-updater = { group = "org.allaymc.stateupdater", name = "block-updater", version = "1.26.60-R1-SNAPSHOT" }
+updater-common = { group = "io.github.ryzemcbe", name = "common", version = "0.1.1" }
+item-updater = { group = "io.github.ryzemcbe", name = "item-updater", version = "1.26.50-R1" }
+block-updater = { group = "io.github.ryzemcbe", name = "block-updater", version = "1.26.60-R1" }
 # Collections
 guava = { group = "com.google.guava", name = "guava", version = "33.7.2-jre" }
 # Fastutil
@@ -77,7 +77,7 @@ joml-primitives = { group = "org.allaymc", name = "joml-primitives", version = "
 netty-epoll = { group = "io.netty", name = "netty-transport-classes-epoll", version.ref = "netty" }
 netty-kqueue = { group = "io.netty", name = "netty-transport-classes-kqueue", version.ref = "netty" }
 # Configulation lib
-okaeri-configs-yaml-snakeyaml = { group = "eu.okaeri", name = "okaeri-configs-yaml-snakeyaml", version = "5.0.13" }
+okaeri-configs-yaml-snakeyaml = { group = "io.github.ryzemcbe", name = "ryze-okaeri-configs-yaml-snakeyaml", version = "5.0.13-ryze.1" }
 # Native Operating System and Hardware Information
 oshi = { group = "com.github.oshi", name = "oshi-core", version = "7.7.2" }
 # GUI
