@@ -43,15 +43,17 @@ class ResourcePackV3Test {
 
     @Test
     void parsesV3ManifestPbrSubpacksAndSettings() {
-        var manifest = PackManifest.fromJson(new StringReader(MANIFEST));
+        var manifest = PackManifestCompatibility.fromJson(new StringReader(MANIFEST));
         assertTrue(manifest.isValid());
         assertEquals("3", manifest.getFormatVersion());
-        assertEquals("1.26.40", manifest.getHeader().getMinEngineVersion().getVersion());
-        assertTrue(manifest.getCapabilities().contains(PackManifest.Capability.PBR));
-        assertTrue(manifest.getCapabilities().contains(PackManifest.Capability.UNKNOWN));
-        assertEquals("SP2", manifest.getSubpacks().get(1).getFolderName());
-        assertEquals(1, manifest.getSubpacks().get(1).getMemoryPerformanceTier());
-        assertEquals(1, manifest.getSettings().size());
+        var metadata = metadata(MANIFEST);
+        assertEquals("1.26.40", metadata.minimumClientVersion());
+        assertEquals("SP2", metadata.subpacks().get(1).folderName());
+        assertEquals(1, metadata.subpacks().get(1).memoryPerformanceTier());
+        var json = com.google.gson.JsonParser.parseString(MANIFEST).getAsJsonObject();
+        assertEquals("pbr", json.getAsJsonArray("capabilities").get(0).getAsString());
+        assertEquals("a_future_capability", json.getAsJsonArray("capabilities").get(1).getAsString());
+        assertEquals(1, json.getAsJsonArray("settings").size());
     }
 
     @Test
@@ -63,23 +65,22 @@ class ResourcePackV3Test {
         minimum.add(26);
         minimum.add(40);
         header.add("min_engine_version", minimum);
-        var manifest = PackManifest.fromJson(new StringReader(json.toString()));
-        assertTrue(manifest.isValid());
-        assertEquals("1.26.40", manifest.getHeader().getMinEngineVersion().getVersion());
-        assertFalse(PackCompatibility.supports(manifest, "1.26.30"));
-        assertTrue(PackCompatibility.supports(manifest, "1.26.60"));
+        var metadata = metadata(json.toString());
+        assertEquals("1.26.40", metadata.minimumClientVersion());
+        assertFalse(PackCompatibility.supports(metadata, "1.26.30"));
+        assertTrue(PackCompatibility.supports(metadata, "1.26.60"));
     }
 
     @Test
     void keepsAutomaticSubpackOrderAndPerformanceTiers() {
-        var manifest = PackManifest.fromJson(new StringReader(MANIFEST));
+        var subpacks = metadata(MANIFEST).subpacks();
         // The server does not choose a subpack; Bedrock uses these
         // declarations to select the best variant for the client's device.
-        assertEquals(2, manifest.getSubpacks().size());
-        assertEquals("SP0", manifest.getSubpacks().get(0).getFolderName());
-        assertEquals("SP2", manifest.getSubpacks().get(1).getFolderName());
-        assertEquals(0, manifest.getSubpacks().get(0).getMemoryPerformanceTier());
-        assertEquals(1, manifest.getSubpacks().get(1).getMemoryPerformanceTier());
+        assertEquals(2, subpacks.size());
+        assertEquals("SP0", subpacks.get(0).folderName());
+        assertEquals("SP2", subpacks.get(1).folderName());
+        assertEquals(0, subpacks.get(0).memoryPerformanceTier());
+        assertEquals(1, subpacks.get(1).memoryPerformanceTier());
     }
 
     @Test
@@ -87,24 +88,20 @@ class ResourcePackV3Test {
         var json = com.google.gson.JsonParser.parseString(MANIFEST).getAsJsonObject();
         var subpacks = json.getAsJsonArray("subpacks");
         subpacks.get(1).getAsJsonObject().addProperty("memory_performance_tier", 0);
-        var manifest = PackManifest.fromJson(new StringReader(json.toString()));
-
-        assertEquals("SP2", AutomaticSubpackSelector.select(manifest),
+        assertEquals("SP2", AutomaticSubpackSelector.select(metadata(json.toString())),
                 "Equal baseline memory tiers should select the last variant");
     }
 
     @Test
     void doesNotForceHighOrMixedTierSubpacksOnLowerEndClients() {
-        var manifest = PackManifest.fromJson(new StringReader(MANIFEST));
-        assertEquals("", AutomaticSubpackSelector.select(manifest),
+        assertEquals("", AutomaticSubpackSelector.select(metadata(MANIFEST)),
                 "Mixed tiers must be delegated to the client");
 
         var json = com.google.gson.JsonParser.parseString(MANIFEST).getAsJsonObject();
         for (var subpack : json.getAsJsonArray("subpacks")) {
             subpack.getAsJsonObject().addProperty("memory_performance_tier", 5);
         }
-        var hdManifest = PackManifest.fromJson(new StringReader(json.toString()));
-        assertEquals("", AutomaticSubpackSelector.select(hdManifest),
+        assertEquals("", AutomaticSubpackSelector.select(metadata(json.toString())),
                 "Do not force a high tier onto clients of unknown memory capacity");
     }
 
@@ -113,17 +110,17 @@ class ResourcePackV3Test {
         var json = com.google.gson.JsonParser.parseString(MANIFEST).getAsJsonObject();
         json.add("subpacks", new com.google.gson.JsonArray());
         assertEquals("", AutomaticSubpackSelector.select(
-                PackManifest.fromJson(new StringReader(json.toString()))));
+                metadata(json.toString())));
     }
 
     @Test
     void skipsIncompatiblePacksButAllowsOldClientsWithOtherPacks() {
-        var manifest = PackManifest.fromJson(new StringReader(MANIFEST));
-        assertFalse(PackCompatibility.supports(manifest, "1.26.30"));
-        assertTrue(PackCompatibility.supports(manifest, "1.26.40"));
-        assertTrue(PackCompatibility.supports(manifest, "1.26.60"));
-        assertTrue(PackCompatibility.supports(manifest, "1.26.60.1"));
-        assertFalse(PackCompatibility.supports(manifest, "not-a-version"));
+        var metadata = metadata(MANIFEST);
+        assertFalse(PackCompatibility.supports(metadata, "1.26.30"));
+        assertTrue(PackCompatibility.supports(metadata, "1.26.40"));
+        assertTrue(PackCompatibility.supports(metadata, "1.26.60"));
+        assertTrue(PackCompatibility.supports(metadata, "1.26.60.1"));
+        assertFalse(PackCompatibility.supports(metadata, "not-a-version"));
         assertTrue(PackCompatibility.isAtLeast("1.27.0", "1.26.40"));
     }
 
@@ -132,7 +129,8 @@ class ResourcePackV3Test {
         // A malformed manifest must be rejected instead of crashing the loader.
         var json = com.google.gson.JsonParser.parseString(MANIFEST).getAsJsonObject();
         json.add("modules", new com.google.gson.JsonArray());
-        assertFalse(PackManifest.fromJson(new StringReader(json.toString())).isValid());
+        assertFalse(PackManifestCompatibility.isValid(
+                PackManifestCompatibility.fromJson(new StringReader(json.toString()))));
     }
 
     @Test
@@ -144,12 +142,12 @@ class ResourcePackV3Test {
         }
         assertTrue(org.allaymc.server.pack.loader.ZipPackLoader.FACTORY.canLoad(zipPath));
         try (var loader = org.allaymc.server.pack.loader.ZipPackLoader.FACTORY.create(zipPath)) {
-            var manifest = PackManifest.load(loader);
+            var manifest = PackManifestCompatibility.load(loader);
             assertNotNull(manifest);
             assertTrue(manifest.isValid());
-            assertEquals("1.26.40", manifest.getHeader().getMinEngineVersion().getVersion());
-            assertTrue(manifest.getCapabilities().contains(PackManifest.Capability.PBR));
-            assertEquals("SP2", manifest.getSubpacks().get(1).getFolderName());
+            var metadata = PackManifestMetadata.read(loader);
+            assertEquals("1.26.40", metadata.minimumClientVersion());
+            assertEquals("SP2", metadata.subpacks().get(1).folderName());
         }
     }
 
@@ -179,6 +177,10 @@ class ResourcePackV3Test {
             assertFalse(java.util.Arrays.equals(sample,
                     zip.getInputStream(zip.getEntry("subpacks/SP2/textures/example.txt")).readAllBytes()));
         }
+    }
+
+    private static PackManifestMetadata.Metadata metadata(String json) {
+        return PackManifestMetadata.parse(new StringReader(json));
     }
 
     private static void entry(ZipOutputStream zos, String path, byte[] bytes) throws Exception {

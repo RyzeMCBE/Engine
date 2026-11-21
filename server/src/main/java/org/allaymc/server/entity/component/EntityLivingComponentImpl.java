@@ -100,6 +100,8 @@ public class EntityLivingComponentImpl implements EntityLivingComponent {
 
     protected Map<EffectType, EffectInstance> effects;
     protected int deadTimer;
+    // Protect the interval after a lethal health update but before tickDead() runs.
+    private boolean deathPending;
 
     public EntityLivingComponentImpl() {
         this.effects = new HashMap<>();
@@ -566,12 +568,11 @@ public class EntityLivingComponentImpl implements EntityLivingComponent {
 
     @Override
     public void setHealth(float value) {
-        if (value > 0 && value < 1) {
-            // Client will think he is dead if the health is less than 1 But server doesn't think so, which
-            // would cause bug So we need to set the health to 0 if it's less than 1 and bigger than 0
-            value = 0;
-        } else {
-            value = max(0, min(value, this.maxHealth));
+        // A value below one heart-point is considered dead by the Bedrock client.
+        value = normalizeHealth(value);
+        if (value > 0 && this.health <= 0 && isAwaitingRespawn()) {
+            // Once death has been registered, only the respawn lifecycle may restore health.
+            return;
         }
 
         var event = new EntityHealthChangeEvent(thisEntity, this.health, value);
@@ -579,7 +580,35 @@ public class EntityLivingComponentImpl implements EntityLivingComponent {
             return;
         }
 
-        this.health = event.getNewHealth();
+        // Plugins may change the requested health, so validate the event result too.
+        var newHealth = normalizeHealth(event.getNewHealth());
+        if (newHealth > 0 && this.health <= 0 && isAwaitingRespawn()) {
+            return;
+        }
+        if (this.health > 0 && newHealth == 0 && this.baseComponent.isAlive()) {
+            deathPending = true;
+        }
+        this.health = newHealth;
+    }
+
+    private float normalizeHealth(float value) {
+        if (!Float.isFinite(value)) {
+            // Never send NaN/Infinity to Bedrock's health attribute.
+            return this.health;
+        }
+        if (value > 0 && value < 1) {
+            return 0;
+        }
+        return max(0, min(value, this.maxHealth));
+    }
+
+    private boolean isAwaitingRespawn() {
+        // The first DESPAWNED state is also used for entities before their initial spawn;
+        // this only blocks *recovery from zero*, not normal initial health setup.
+        var state = this.baseComponent.getState();
+        return deathPending || state == EntityState.DEAD ||
+               state == EntityState.DESPAWNED_LATER ||
+               state == EntityState.DESPAWNED;
     }
 
     @Override
@@ -683,7 +712,9 @@ public class EntityLivingComponentImpl implements EntityLivingComponent {
 
     /// Tick and update the duration of all the active effects this entity is holding currently.
     protected void tickEffects() {
-        if (this.effects.isEmpty()) {
+        // A lethal hit can happen earlier in the same tick. Regeneration must not
+        // revive the entity before tickDead() records its death.
+        if (this.effects.isEmpty() || this.health <= 0 || isAwaitingRespawn()) {
             return;
         }
 
@@ -699,7 +730,7 @@ public class EntityLivingComponentImpl implements EntityLivingComponent {
     /// Check if the entity should dead and update the dead timer after the death if dead timer is
     /// enabled for this entity.
     protected void tickDead() {
-        if (this.health == 0 && !this.baseComponent.isDead()) {
+        if (this.health == 0 && this.baseComponent.isAlive()) {
             onDie();
         }
 
@@ -742,6 +773,12 @@ public class EntityLivingComponentImpl implements EntityLivingComponent {
 
     /// Called when the entity dead (health == 0)
     protected void onDie() {
+        // Commit the state before invoking plugin callbacks. Otherwise a death listener
+        // can heal the entity while it is still ALIVE, leaving DEAD with positive health.
+        if (!((EntityBaseComponentImpl) this.baseComponent).setState(EntityState.DEAD)) {
+            return;
+        }
+        deathPending = false;
         new EntityDieEvent(thisEntity).call();
 
         var pos = baseComponent.getLocation();
@@ -781,7 +818,6 @@ public class EntityLivingComponentImpl implements EntityLivingComponent {
         }
 
         this.effects.values().forEach(effect -> effect.getType().onEntityDies(thisEntity, effect));
-        ((EntityBaseComponentImpl) this.baseComponent).setState(EntityState.DEAD);
         if (hasDeadTimer()) {
             this.deadTimer = 20;
         }
