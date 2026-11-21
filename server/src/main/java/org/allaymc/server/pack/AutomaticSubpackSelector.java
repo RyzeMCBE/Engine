@@ -1,6 +1,6 @@
 package org.allaymc.server.pack;
 
-import org.allaymc.api.pack.PackManifest;
+import org.allaymc.api.pack.Pack;
 
 /**
  * Selects a universally compatible Bedrock subpack without server configuration.
@@ -17,27 +17,31 @@ public final class AutomaticSubpackSelector {
     private AutomaticSubpackSelector() {
     }
 
-    public static String select(PackManifest manifest) {
-        if (manifest == null || manifest.getSubpacks() == null || manifest.getSubpacks().isEmpty()) {
+    public static String select(Pack pack) {
+        return select(PackManifestMetadata.forPack(pack));
+    }
+
+    static String select(PackManifestMetadata.Metadata metadata) {
+        if (metadata == null || !metadata.valid() || metadata.subpacks().isEmpty()) {
             return "";
         }
-        var subpacks = manifest.getSubpacks();
+        var subpacks = metadata.subpacks();
         var first = subpacks.getFirst();
         if (first == null) return "";
 
-        int baselineTier = first.getMemoryPerformanceTier();
+        int baselineTier = first.memoryPerformanceTier();
         if (baselineTier < 0 || baselineTier > 1) {
             return "";
         }
 
         String selected = "";
         for (var subpack : subpacks) {
-            if (subpack == null || subpack.getMemoryPerformanceTier() != baselineTier
-                    || subpack.getFolderName() == null || subpack.getFolderName().isBlank()) {
+            if (subpack == null || subpack.memoryPerformanceTier() != baselineTier
+                    || subpack.folderName() == null || subpack.folderName().isBlank()) {
                 return "";
             }
             // The last declared subpack wins when memory tiers are equal.
-            selected = subpack.getFolderName();
+            selected = subpack.folderName();
         }
         return selected;
     }
