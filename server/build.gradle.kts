@@ -16,7 +16,7 @@ application {
 }
 
 // Publish the ordinary Java component, not shadowJar.
-// Central mode is opt-in and only after matching Protocol/StateUpdater releases exist.
+// Both development and Central release modes resolve external dependencies from Maven Central.
 val centralRelease = providers.gradleProperty("centralRelease")
     .map(String::toBoolean).getOrElse(false)
 
@@ -60,7 +60,7 @@ dependencies {
     api(libs.disruptor)
     api(libs.netty.epoll)
     api(libs.netty.kqueue)
-    // Preserve the Protocol submodule's older RakNet API: BedrockPeer still
+    // Preserve the published Protocol transport's older RakNet API: BedrockPeer still
     // links RakDisconnectReason, removed from Cloudburst RakNet 2.x.
     if (centralRelease) {
         api("io.github.ryzemcbe:ryze-netty-transport-nethernet:2.0.0.CR6-ryze.1") {
@@ -71,7 +71,7 @@ dependencies {
     }
     // Only the Linux glibc x86_64 native WebRTC transport is bundled.
     // The native runtime belongs to the executable distribution, not the developer SDK POM.
-    if (!centralRelease) runtimeOnly("dev.opencollab:libdatachannel-java:${libs.versions.libdatachannel.get()}:linux-glibc-x86_64")
+    if (!centralRelease) runtimeOnly("io.github.ryzemcbe:ryze-libdatachannel-java:${libs.versions.libdatachannel.get()}:linux-glibc-x86_64")
     api("io.netty:netty-codec-http:${libs.versions.netty.get()}")
     runtimeOnly("io.netty:netty-transport-native-epoll:${libs.versions.netty.get()}:linux-x86_64")
     runtimeOnly("io.netty:netty-transport-native-epoll:${libs.versions.netty.get()}:linux-aarch_64")
