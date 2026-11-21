@@ -127,6 +127,16 @@ public class AllayWorld implements World {
         }
     }
 
+    /** Largest measured tick workload in the recent tick window. */
+    public float getPeakMSPT() {
+        return gameLoop.getPeakMSPT();
+    }
+
+    /** Largest wall-clock interval between consecutive ticks. */
+    public float getMaxTickIntervalMS() {
+        return gameLoop.getMaxTickIntervalMS();
+    }
+
     private void worldThreadMain(GameLoop gameLoop) {
         this.worldData.setTotalTime(gameLoop.getTick());
         if (getState() != WorldState.RUNNING) {
