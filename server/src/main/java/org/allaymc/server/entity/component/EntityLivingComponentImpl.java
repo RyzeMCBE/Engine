@@ -100,6 +100,8 @@ public class EntityLivingComponentImpl implements EntityLivingComponent {
 
     protected Map<EffectType, EffectInstance> effects;
     protected int deadTimer;
+    // Protect the interval after a lethal health update but before tickDead() runs.
+    private boolean deathPending;
 
     public EntityLivingComponentImpl() {
         this.effects = new HashMap<>();
@@ -583,6 +585,9 @@ public class EntityLivingComponentImpl implements EntityLivingComponent {
         if (newHealth > 0 && this.health <= 0 && isAwaitingRespawn()) {
             return;
         }
+        if (this.health > 0 && newHealth == 0 && this.baseComponent.isAlive()) {
+            deathPending = true;
+        }
         this.health = newHealth;
     }
 
@@ -601,7 +606,7 @@ public class EntityLivingComponentImpl implements EntityLivingComponent {
         // The first DESPAWNED state is also used for entities before their initial spawn;
         // this only blocks *recovery from zero*, not normal initial health setup.
         var state = this.baseComponent.getState();
-        return state == EntityState.DEAD ||
+        return deathPending || state == EntityState.DEAD ||
                state == EntityState.DESPAWNED_LATER ||
                state == EntityState.DESPAWNED;
     }
@@ -773,6 +778,7 @@ public class EntityLivingComponentImpl implements EntityLivingComponent {
         if (!((EntityBaseComponentImpl) this.baseComponent).setState(EntityState.DEAD)) {
             return;
         }
+        deathPending = false;
         new EntityDieEvent(thisEntity).call();
 
         var pos = baseComponent.getLocation();
