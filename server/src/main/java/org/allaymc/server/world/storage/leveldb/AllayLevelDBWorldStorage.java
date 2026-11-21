@@ -443,15 +443,18 @@ public class AllayLevelDBWorldStorage implements WorldStorage {
     }
 
     protected CompletableFuture<Void> writeEntities0(int chunkX, int chunkZ, DimensionType dimensionType, Map<Long, Entity> entities, boolean asyncWrite) {
+        // The write batch must outlive the asynchronous write. Closing it in a
+        // try-with-resources here races the worker and can silently lose NBT.
+        var writeBatch = this.db.createWriteBatch();
         var idsBuf = ByteBufAllocator.DEFAULT.buffer();
-        try (var writeBatch = this.db.createWriteBatch()) {
+        try {
             var idsKey = LevelDBKey.createEntityIdsKey(chunkX, chunkZ, dimensionType);
 
             // Delete the old entities in this chunk
             var oldIds = this.db.get(idsKey);
             if (oldIds != null) {
                 var oldIdsBuf = Unpooled.wrappedBuffer(oldIds);
-                for (var i = 0; i < oldIds.length; i += Long.BYTES) {
+                for (var i = 0; i + Long.BYTES <= oldIds.length; i += Long.BYTES) {
                     writeBatch.delete(LevelDBKey.indexEntity(oldIdsBuf.readLongLE()));
                 }
             }
@@ -465,8 +468,15 @@ public class AllayLevelDBWorldStorage implements WorldStorage {
 
             writeBatch.put(idsKey, ByteBufUtil.getBytes(idsBuf));
             return handleEntitiesWriteBatch(chunkX, chunkZ, writeBatch, asyncWrite);
-        } catch (IOException e) {
-            throw new WorldStorageException(e);
+        } catch (RuntimeException failure) {
+            // The worker owns the batch only after scheduling succeeds. If
+            // preparing or scheduling fails, the caller must release it.
+            try {
+                writeBatch.close();
+            } catch (IOException closeFailure) {
+                failure.addSuppressed(closeFailure);
+            }
+            throw failure;
         } finally {
             idsBuf.release();
         }
@@ -475,14 +485,26 @@ public class AllayLevelDBWorldStorage implements WorldStorage {
     protected CompletableFuture<Void> handleEntitiesWriteBatch(int chunkX, int chunkZ, WriteBatch writeBatch, boolean asyncWrite) {
         if (asyncWrite) {
             return CompletableFuture
-                    .runAsync(() -> this.db.write(writeBatch), Server.getInstance().getVirtualThreadPool())
-                    .exceptionally(t -> {
-                        log.error("Failed to write entities in chunk ({}, {})", chunkX, chunkZ, t);
-                        return null;
+                    .runAsync(() -> {
+                        try (writeBatch) {
+                            this.db.write(writeBatch);
+                        } catch (IOException e) {
+                            throw new WorldStorageException(e);
+                        }
+                    }, Server.getInstance().getVirtualThreadPool())
+                    .whenComplete((ignored, failure) -> {
+                        if (failure != null) {
+                            // Do not turn failed persistence into a successful future.
+                            log.error("Failed to write entities in chunk ({}, {})", chunkX, chunkZ, failure);
+                        }
                     });
         }
 
-        this.db.write(writeBatch);
+        try (writeBatch) {
+            this.db.write(writeBatch);
+        } catch (IOException e) {
+            throw new WorldStorageException(e);
+        }
         return CompletableFuture.completedFuture(null);
     }
 

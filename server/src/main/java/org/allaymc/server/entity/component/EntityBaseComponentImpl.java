@@ -591,6 +591,9 @@ public class EntityBaseComponentImpl implements EntityBaseComponent {
 
     @Override
     public void loadNBT(NbtMap nbt) {
+        // Component NBT listeners may publish entity events (e.g. health changes)
+        // that require the identity to exist during deserialization.
+        loadUniqueId(nbt);
         this.manager.callEvent(new CEntityLoadNBTEvent(nbt));
 
         if (nbt.containsKey(TAG_POS)) {
@@ -611,8 +614,6 @@ public class EntityBaseComponentImpl implements EntityBaseComponent {
             this.persistentDataContainer.clear();
             this.persistentDataContainer.putAll(customNbt);
         });
-
-        loadUniqueId(nbt);
 
         if (nbt.containsKey(TAG_PORTAL_COOLDOWN)) {
             this.portalCooldown = nbt.getInt(TAG_PORTAL_COOLDOWN);
