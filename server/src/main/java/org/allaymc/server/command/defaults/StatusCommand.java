@@ -183,6 +183,11 @@ public class StatusCommand extends Command {
             sender.sendMessage("- " + world.getWorldData().getDisplayName());
             sender.sendMessage("  TPS: " + TextFormat.GREEN + world.getTPS());
             sender.sendMessage("  MSPT: " + TextFormat.GREEN + world.getMSPT());
+            if (world instanceof org.allaymc.server.world.AllayWorld allayWorld) {
+                var loop = allayWorld.getGameLoop();
+                sender.sendMessage("  Peak MSPT (20 ticks): " + TextFormat.GREEN + loop.getPeakMSPT());
+                sender.sendMessage("  Max tick gap (20 ticks): " + TextFormat.GREEN + loop.getMaxTickIntervalMS() + " ms");
+            }
             sender.sendMessage("  TickUsage: " + TextFormat.GREEN + (world.getTickUsage() * 100f) + "%");
 
             var dims = world.getDimensions().values();
