@@ -82,6 +82,20 @@ class DeathHealthConsistencyTest {
     }
 
     @Test
+    void lethalHealthCannotBeReversedBeforeTheDeathTick() {
+        var entity = mock(EntityLiving.class);
+        var base = mock(EntityBaseComponent.class);
+        when(base.getState()).thenReturn(EntityState.ALIVE);
+        when(base.isAlive()).thenReturn(true);
+        var living = new TestLiving(entity, base, 4);
+
+        living.setHealth(0f);
+        living.setHealth(8f);
+
+        assertEquals(0f, living.getHealth(), "Health must stay at zero until death is processed");
+    }
+
+    @Test
     void zeroHealthDoesNotTickRegenerationBeforeDeathProcessing() {
         var entity = mock(EntityLiving.class);
         var base = mock(EntityBaseComponent.class);
