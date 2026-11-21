@@ -5,6 +5,7 @@ import org.allaymc.api.player.Player;
 import org.allaymc.api.registry.Registries;
 import org.allaymc.server.AllayServer;
 import org.allaymc.server.network.processor.ingame.ILoginPacketProcessor;
+import org.allaymc.server.pack.PackCompatibility;
 import org.allaymc.server.player.AllayPlayer;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacketType;
 import org.cloudburstmc.protocol.bedrock.packet.ResourcePackChunkRequestPacket;
@@ -20,7 +21,7 @@ public class ResourcePackChunkRequestPacketProcessor extends ILoginPacketProcess
         var allayPlayer = (AllayPlayer) player;
         var protocol = allayPlayer.getProtocol();
         var pack = Registries.PACKS.get(packet.getPackId());
-        if (pack == null) {
+        if (!PackCompatibility.supports(pack, allayPlayer.getLoginData().getGameVersion())) {
             player.disconnect(TrKeys.MC_DISCONNECTIONSCREEN_RESOURCEPACK);
             return;
         }
